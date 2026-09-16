@@ -1688,7 +1688,7 @@ class SelfCheckViewModel @Inject constructor(
             _msg.value = AppLanguage.text("Please login again.", "Sila log masuk semula.", "请重新登录。", "மீண்டும் உள்நுழையவும்.")
             return@launch
         }
-        if (sys !in 70..260 || dia !in 35..160 || pulse !in 35..220 || sys <= dia) {
+        if (sys !in 0..260 || dia !in 0..160 || pulse !in 0..220 || sys <= dia) {
             _msg.value = AppLanguage.text(
                 "Please enter valid SYS, DIA and Pulse values. SYS must be higher than DIA.",
                 "Sila masukkan nilai SYS, DIA dan Nadi yang sah. SYS mesti lebih tinggi daripada DIA.",
@@ -1911,7 +1911,7 @@ fun SelfCheckFullScreen(onBack: () -> Unit, focus: String? = null, vm: SelfCheck
                 Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(AppLanguage.text("Vital Tracker", "Penjejak Vital"), fontWeight = FontWeight.Bold)
-                        // Healthy choices appear first; the full input range remains selectable.
+                        // Healthy choices appear first; low patient readings remain selectable down to zero.
                         NumberRollFieldSimple(
                             value = sys,
                             values = ((0..79) + (80..139) + (140..260)).toList(),
@@ -1954,9 +1954,9 @@ fun SelfCheckFullScreen(onBack: () -> Unit, focus: String? = null, vm: SelfCheck
                         Button(
                             onClick = { vm.saveVitals(date, sys.toIntOrNull() ?: 0, dia.toIntOrNull() ?: 0, pulse.toIntOrNull() ?: 0) },
                             enabled = savingLabel == null &&
-                                (sys.toIntOrNull() ?: 0) in 70..260 &&
-                                (dia.toIntOrNull() ?: 0) in 35..160 &&
-                                (pulse.toIntOrNull() ?: 0) in 35..220 &&
+                                (sys.toIntOrNull() ?: -1) in 0..260 &&
+                                (dia.toIntOrNull() ?: -1) in 0..160 &&
+                                (pulse.toIntOrNull() ?: -1) in 0..220 &&
                                 (sys.toIntOrNull() ?: 0) > (dia.toIntOrNull() ?: 0),
                             modifier = Modifier.fillMaxWidth()
                         ) {
