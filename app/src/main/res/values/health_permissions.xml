@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    This string-array is referenced by the <meta-data android:name="health_permissions"> tag
+    in AndroidManifest.xml.
+
+    The Health Connect SDK reads this array at runtime to verify that the app has properly
+    declared every permission it intends to request. If this file is missing OR any permission
+    used in code is absent from this list, the SDK throws:
+        "android.permission.health.READ_STEPS is not declared!"
+
+    Keep this list in sync with:
+      - the <uses-permission> entries in AndroidManifest.xml
+      - the permissions sets in HealthConnectManager.kt and DashboardScreen.kt
+-->
+<resources>
+    <array name="health_permissions">
+        <item>android.permission.health.READ_STEPS</item>
+        <item>android.permission.health.READ_HEART_RATE</item>
+        <item>android.permission.health.READ_OXYGEN_SATURATION</item>
+    </array>
+</resources>

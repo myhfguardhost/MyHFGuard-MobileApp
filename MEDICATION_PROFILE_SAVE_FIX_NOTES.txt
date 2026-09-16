@@ -1,0 +1,27 @@
+MyHFGuard - Medication Profile Save Fix (2026-08-21)
+====================================================
+
+Observed error:
+HTTP 400 / PostgreSQL P0001 - "Profile is locked and cannot be edited"
+
+Root cause:
+The Android profile UI intentionally allows Current Medication to remain editable,
+but the deployed Supabase profile-lock trigger rejects every UPDATE to a locked
+profiles row, including current_medication.
+
+Fixes applied:
+- Current Medication is now saved to the dedicated `medication` table first.
+- Profile reload uses medication-table records when available.
+- Dashboard prefers medication-table records so stale legacy profile text is not duplicated.
+- Medication reminder worker prefers editable medication-table records.
+- The app still attempts a best-effort sync to profiles.current_medication.
+- Added database_fixes/ALLOW_LOCKED_PROFILE_MEDICATION_UPDATE.sql for the recommended
+  one-time Supabase trigger correction.
+
+Sample supported profile input:
+Furosemide 40 mg — Once daily
+Bisoprolol 2.5 mg — Once daily
+Sacubitril/Valsartan 24/26 mg — Twice daily
+
+Recommended:
+Run database_fixes/ALLOW_LOCKED_PROFILE_MEDICATION_UPDATE.sql once in Supabase SQL Editor.

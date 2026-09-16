@@ -1,0 +1,35 @@
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :app:compileDebugKotlin
+w: file:///D:/Noelle/FYP/MyHFGuard/app/src/main/java/com/vitalink/app/ui/screens/AIChatScreen.kt:1326:44 'val Icons.Filled.Send: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Send.
+w: file:///D:/Noelle/FYP/MyHFGuard/app/src/main/java/com/vitalink/app/ui/screens/DashboardScreen.kt:941:44 'val Icons.Filled.Logout: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Logout.
+w: file:///D:/Noelle/FYP/MyHFGuard/app/src/main/java/com/vitalink/app/ui/screens/DashboardScreen.kt:1127:35 'val Icons.Filled.Help: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Help.
+w: file:///D:/Noelle/FYP/MyHFGuard/app/src/main/java/com/vitalink/app/ui/screens/DashboardScreen.kt:1359:49 'val Icons.Filled.DirectionsWalk: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.DirectionsWalk.
+w: file:///D:/Noelle/FYP/MyHFGuard/app/src/main/java/com/vitalink/app/ui/screens/DashboardScreen.kt:1431:53 'val Icons.Filled.DirectionsWalk: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.DirectionsWalk.
+w: file:///D:/Noelle/FYP/MyHFGuard/app/src/main/java/com/vitalink/app/ui/screens/DashboardScreen.kt:1573:36 'val Icons.Filled.OpenInNew: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.OpenInNew.
+w: file:///D:/Noelle/FYP/MyHFGuard/app/src/main/java/com/vitalink/app/ui/screens/DashboardScreen.kt:2230:31 'val Icons.Filled.DirectionsWalk: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.DirectionsWalk.
+w: file:///D:/Noelle/FYP/MyHFGuard/app/src/main/java/com/vitalink/app/ui/screens/DashboardScreen.kt:2435:36 'val Icons.Filled.ShowChart: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ShowChart.
+w: file:///D:/Noelle/FYP/MyHFGuard/app/src/main/java/com/vitalink/app/ui/screens/MachineScanButtons.kt:270:25 Condition is always 'false'.
+w: file:///D:/Noelle/FYP/MyHFGuard/app/src/main/java/com/vitalink/app/ui/screens/OtherScreens.kt:190:44 'val Icons.Filled.OpenInNew: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.OpenInNew.
+w: file:///D:/Noelle/FYP/MyHFGuard/app/src/main/java/com/vitalink/app/ui/screens/OtherScreens.kt:1021:39 'val Icons.Filled.DirectionsWalk: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.DirectionsWalk.
+w: file:///D:/Noelle/FYP/MyHFGuard/app/src/main/java/com/vitalink/app/ui/screens/RegisterScreen.kt:152:44 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///D:/Noelle/FYP/MyHFGuard/app/src/main/java/com/vitalink/app/ui/screens/VitalsScreen.kt:188:86 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///D:/Noelle/FYP/MyHFGuard/app/src/main/java/com/vitalink/app/ui/theme/Theme.kt:96:17 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+
+BUILD SUCCESSFUL in 51s
+15 actionable tasks: 1 executed, 14 up-to-date
