@@ -1,0 +1,25 @@
+MyHFGuard Tamil Custom Notification Sounds
+==========================================
+
+Added 21 August 2026.
+
+Language behavior:
+- English app language -> English custom notification audio
+- Bahasa Melayu app language -> Malay custom notification audio
+- Tamil app language -> Tamil custom notification audio
+- Mandarin app language -> English custom notification audio (fallback until Mandarin recordings are supplied)
+
+Tamil source files were supplied with generic filenames. They were assigned using the established 11-notification order used for the English/BM packs, supported by the clip ordering and duration pattern:
+1. video.mp4 -> Medication
+2. Video_20260821_224350_035.mp4 -> Appointment
+3. Video_20260821_224350_052.mp4 -> Blood pressure
+4. Video_20260821_224350_055.mp4 -> Weight
+5. Video_20260821_224350_063.mp4 -> Symptom
+6. Video_20260821_224350_067.mp4 -> Water
+7. Video_20260821_224350_074.mp4 -> Salt
+8. Video_20260821_224350_078.mp4 -> Steps/activity
+9. Video_20260821_224350_085.mp4 -> Education
+10. Video_20260821_224350_087.mp4 -> Mi Fitness refresh
+11. Video_20260821_224350_089.mp4 -> Multiple missing daily records / log all data
+
+Android 8+ notification channels cache their sound configuration. CHANNEL_VERSION was increased to v5 so existing installs create fresh language-aware channels and Tamil audio is applied correctly.

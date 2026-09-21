@@ -1,0 +1,28 @@
+MyHFGuard Medication Profile Save Fix V2
+========================================
+
+Problem fixed
+-------------
+The deployed Supabase `medication` table does not contain a `frequency` column.
+The previous app build posted `frequency`, `dosage`, `time_of_day`, `notes` and
+`is_active`, which caused Supabase/PostgREST error PGRST204 before the save could
+complete.
+
+Fix
+---
+1. Profile now stores each complete medicine line in medication.name.
+2. The insert uses only the older schema columns: patient_id, name, active.
+3. It automatically falls back to is_active or the database default if needed.
+4. Reading maps both `active` and `is_active` to the Android model.
+5. Profile and Dashboard display the complete stored medicine line.
+6. Medication reminders infer noon/night from words in the stored line.
+7. profiles.current_medication is still synchronized on a best-effort basis when
+   the database profile-lock trigger allows it.
+
+Example input
+-------------
+Furosemide 40 mg (noon)
+Bisoprolol 2.5 mg (noon)
+Sacubitril/Valsartan 24/26 mg (noon, night)
+
+This V2 build also includes the Samsung TTS chooser fix from the previous build.

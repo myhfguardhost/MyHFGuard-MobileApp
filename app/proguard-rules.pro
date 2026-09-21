@@ -1,0 +1,3 @@
+-keep class com.vitalink.app.data.model.** { *; }
+-keepattributes Signature, *Annotation*
+-dontwarn okhttp3.**, retrofit2.**

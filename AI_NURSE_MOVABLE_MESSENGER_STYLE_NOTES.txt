@@ -1,0 +1,25 @@
+MyHFGuard AI Nurse - Messenger-style floating bubble update
+Date: 2026-08-21
+
+Changed files:
+1. app/src/main/java/com/vitalink/app/ui/screens/FloatingAiNurse.kt
+2. app/src/main/java/com/vitalink/app/navigation/NavHost.kt
+
+New behavior:
+- Drag the AI Nurse icon freely around the available screen area.
+- Release it and the icon snaps to the nearest left/right edge.
+- Drag it slightly past the left or right edge to tuck/hide about half of the bubble, similar to a Messenger chat head.
+- The partially hidden bubble remains tappable. Tap it to restore and open the AI Nurse.
+- The last side, vertical position and tucked/visible state are remembered across app screens.
+- The bubble stays above the bottom navigation area.
+- The full AI Nurse card is kept inside the screen even if the bubble is near a corner.
+- Existing Gemini, speech recognition, TTS and four-language behavior were not intentionally changed.
+
+Build verification note:
+The source was checked structurally in the provided environment. A full Gradle compile could not run because the Gradle wrapper attempted to download Gradle 8.7 from services.gradle.org, but this execution environment has no direct network access.
+
+Build fix (2026-08-21):
+- Added missing Jetpack Compose import:
+  import androidx.compose.foundation.layout.offset
+- This resolves the compileDebugKotlin error in FloatingAiNurse.kt where Modifier.offset { IntOffset(...) } was reported as an unresolved reference.
+- The dagger.fastInit / dagger.hilt warning shown by kapt is only a warning and is unrelated to this failure.

@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Allow app to check whether Health Connect is installed -->
+    <!-- com.google.android.apps.healthdata = Health Connect (Android / Google Pixel) -->
+    <!-- com.bbk.healthapp = vivo Health app (provides Health Connect on vivo devices) -->
+    <!-- com.vivo.health = alternate vivo Health package seen on some firmware versions -->
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+        <package android:name="com.bbk.healthapp" />
+        <package android:name="com.vivo.health" />
+        <!-- Mi Fitness package names used on Xiaomi/Honor devices. -->
+        <package android:name="com.xiaomi.wearable" />
+        <package android:name="com.mi.health" />
+
+        <!-- Google Speech Recognition & Synthesis / TTS engine. -->
+        <package android:name="com.google.android.tts" />
+
+        <!-- Package visibility for the floating AI Nurse voice features. -->
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.tts.engine.INSTALL_TTS_DATA" />
+        </intent>
+    </queries>
+
+    <!-- Internet access -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Camera access for weight and blood-pressure OCR -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- Notification permission for Android 13+ -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+    <!-- Biometric login permission -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+
+    <!-- Health Connect permissions -->
+    <!-- On Android 14+ (API 34+) these are OS-native permissions.              -->
+    <!-- On Android 9-13 (API 28-33) they are granted by the Health Connect APK -->
+    <!-- (or the vivo Health app on vivo devices).                               -->
+    <!-- The android:minSdkVersion guard prevents the installer from rejecting   -->
+    <!-- the unknown permission string on very old OS versions.                  -->
+    <uses-permission android:name="android.permission.health.READ_STEPS"
+        android:minSdkVersion="26" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE"
+        android:minSdkVersion="26" />
+    <uses-permission android:name="android.permission.health.READ_OXYGEN_SATURATION"
+        android:minSdkVersion="26" />
+    <uses-permission android:name="android.permission.health.READ_WEIGHT"
+        android:minSdkVersion="26" />
+    <uses-permission android:name="android.permission.health.READ_BLOOD_PRESSURE"
+        android:minSdkVersion="26" />
+    <uses-permission android:name="android.permission.health.READ_SLEEP"
+        android:minSdkVersion="26" />
+
+    <application
+        android:name=".MyHFGuardApp"
+        android:allowBackup="true"
+        android:icon="@drawable/logo"
+        android:roundIcon="@drawable/logo"
+        android:label="MyHFGuard"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.MyHFGuard">
+
+<!-- Required by Health Connect on Android 13 and lower. -->
+<activity
+    android:name=".PermissionsRationaleActivity"
+    android:exported="true">
+    <intent-filter>
+        <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+    </intent-filter>
+    <meta-data
+        android:name="health_permissions"
+        android:resource="@array/health_permissions" />
+</activity>
+
+<!-- Required by Health Connect on Android 14 and higher. -->
+<activity-alias
+    android:name=".ViewPermissionUsageActivity"
+    android:exported="true"
+    android:targetActivity=".PermissionsRationaleActivity"
+    android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+    <intent-filter>
+        <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+        <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+    </intent-filter>
+</activity-alias>
+
+<!-- Dedicated permission launcher used by Dashboard button. -->
+<activity
+    android:name=".HealthConnectPermissionActivity"
+    android:exported="false"
+    android:theme="@style/Theme.MyHFGuard" />
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Opens Supabase signup confirmation links inside the app login page. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="myhfguard"
+                    android:host="login" />
+            </intent-filter>
+
+        </activity>
+
+
+
+        <receiver
+            android:name=".reminders.MedicationAlarmReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!--
+            REQUIRED by Health Connect SDK: declares which health permissions this app uses.
+            Without this <meta-data> tag the SDK's runtime check cannot find the permission
+            declarations and throws "android.permission.health.READ_STEPS is not declared!"
+            even when <uses-permission> entries exist in the manifest.
+            See: https://developer.android.com/health-and-fitness/guides/health-connect/develop/get-started#declare-permissions
+        -->
+        <meta-data
+            android:name="health_permissions"
+            android:resource="@array/health_permissions" />
+
+        <!--
+            REQUIRED by Health Connect: Without this privacy policy URL the "Connect"
+            button on the Health Connect permission screen is permanently GREYED OUT
+            and cannot be tapped, even if the user wants to grant permissions.
+            Health Connect enforces this as a mandatory safety/transparency requirement.
+        -->
+        <meta-data
+            android:name="android.content.pm.PRIVACY_POLICY_URL"
+            android:value="@string/privacy_policy_url" />
+
+    </application>
+
+</manifest>

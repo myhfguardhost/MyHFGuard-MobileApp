@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MyHFGuard</string>
+
+    <!--
+        REQUIRED by Health Connect: The "Connect" button in the Health Connect
+        permission screen stays GREYED OUT and untappable unless the app declares
+        a privacy policy URL here. This is enforced by Health Connect UI as a
+        safety requirement — no privacy policy = no permission granted.
+    -->
+    <string name="privacy_policy_url">https://myhfguardhost.github.io/privacy-policy</string>
+</resources>

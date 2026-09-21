@@ -1,0 +1,73 @@
+MYHFGUARD AI FRONTEND FIX
+
+The screenshot reply:
+"Sorry, I focus on heart care. Try asking about BP, SpO₂, weight..."
+
+does not match the rejection text in the server.js version reviewed. This normally means one of these is still active:
+
+1. A keyword filter inside the web/mobile chatbot component.
+2. A hard-coded fallback response in the frontend.
+3. The frontend is calling an older deployed backend URL.
+4. The latest server commit was not redeployed.
+
+REQUIRED FRONTEND CHANGE
+
+Search the whole web and mobile projects for these phrases:
+- "Sorry, I focus on heart care"
+- "Try asking about BP"
+- "focus on heart care"
+- "healthPatterns"
+- "hasHealthSignal"
+- "/api/chat/symptoms"
+
+Delete any frontend logic that rejects a message before it reaches the backend.
+
+The send function should always call the backend for every non-empty message:
+
+const response = await fetch(`${API_BASE_URL}/api/chat/symptoms`, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    message: input.trim(),
+    patientId: user.id,
+    history: messages.slice(-10).map((item) => ({
+      role: item.role,
+      content: item.content,
+    })),
+  }),
+})
+
+if (!response.ok) {
+  throw new Error(`Chat request failed: ${response.status}`)
+}
+
+const data = await response.json()
+const assistantReply =
+  data.reply || 'I could not answer just now. Please try again.'
+
+IMPORTANT DEPLOYMENT CHECK
+
+Open the browser Network tab and send:
+"How is my health?"
+
+Confirm:
+- Request URL ends with /api/chat/symptoms
+- Request body contains message and patientId
+- Response body comes from the newly deployed server
+- Render/server logs show: [MyChat] Request received
+
+EXPECTED BEHAVIOUR
+
+"How is my health?"
+The bot should summarize recent HR, BP, SpO₂, weight, steps and symptoms, mention missing data, and give practical next actions.
+
+"Am I getting better?"
+The bot should use recent trends and explain that the data cannot confirm a diagnosis.
+
+"I feel more breathless today."
+The bot should assess urgency, use available readings and advise the correct next action.
+
+"What about yesterday?"
+The bot should understand this as a follow-up because the frontend sends recent chat history.

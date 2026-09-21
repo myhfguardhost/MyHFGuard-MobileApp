@@ -1,0 +1,27 @@
+MyHFGuard - English + Bahasa Melayu Custom Notification Sounds
+Updated: 2026-08-21
+
+Behaviour
+---------
+- App language English: uses the existing English custom notification audio.
+- App language Bahasa Melayu: uses the matching Bahasa Melayu custom notification audio.
+- App language Mandarin/Tamil: currently falls back to the English audio until dedicated recordings are supplied.
+- Android 8+ notification channels include the audio language in the channel ID, so changing the app language also changes the channel sound reliably.
+
+Bahasa Melayu mappings
+----------------------
+appointment        -> notification_appointment_ms.mp3        (temu janji.mp4)
+blood pressure     -> notification_blood_pressure_ms.mp3     (darah tekanan.mp4)
+education          -> notification_education_ms.mp3          (education.mp4)
+medicine           -> notification_medicine_ms.mp3           (ubat.mp4)
+Mi Fitness refresh -> notification_refresh_mi_band_ms.mp3    (buka mi fitness.mp4)
+all daily logs     -> notification_log_all_data_ms.mp3       (sila masuk all rekod.mp4)
+salt               -> notification_salt_ms.mp3               (garam rekod.mp4)
+symptom            -> notification_symptom_ms.mp3            (tahap symptom.mp4)
+steps/activity      -> notification_steps_ms.mp3              (lebih aktif dan bergerak.mp4)
+water               -> notification_water_ms.mp3              (rekod air.mp4)
+weight              -> notification_weight_ms.mp3             (berat.mp4)
+
+Note
+----
+The separate dashboard red/critical-alert channel from the original app still does not have a dedicated supplied critical-alert recording. It was not replaced with an unrelated voice prompt.

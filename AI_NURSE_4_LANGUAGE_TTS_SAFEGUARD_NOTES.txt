@@ -1,0 +1,22 @@
+MyHFGuard AI Nurse - 4-language TTS safeguard update (2026-08-20)
+
+Implemented:
+1. App-language lock across STT -> Gemini -> TTS.
+2. Gemini backend prompts explicitly prevent language drift during Malaysian code-switching.
+3. Android TTS tries language-specific locale candidates instead of falling back to English phonemes.
+4. If Malay/Mandarin/Tamil voice data is missing, the app keeps the AI response text visible and prompts the device owner to install TTS voice data.
+5. TTS installer intent is handled safely; if unavailable, a localized message asks the user to install/update Speech Services by Google.
+6. TTS voice availability is checked when the selected app language becomes active.
+7. AI Nurse remains hidden on the full My AI chatbot screen.
+
+STT mapping:
+English -> en-MY
+Bahasa Melayu -> ms-MY
+Mandarin -> zh-CN
+Tamil -> ta-IN (chosen for broader Android recognizer support; Gemini/TTS output remains Tamil)
+
+Preferred TTS locales:
+English -> en-MY, then English fallbacks
+Bahasa Melayu -> ms-MY, then ms
+Mandarin -> Simplified Chinese / zh-CN
+Tamil -> ta-MY, then ta-IN, then ta

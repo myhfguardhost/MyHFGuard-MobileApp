@@ -11,3 +11,33 @@
 .kotlin/
 **/build/
 local.properties
+# Local Android and IDE state
+.android/
+.android-user-home/
+.gradle-user-home/
+.idea/
+*.iml
+.kotlin/
+*.keystore
+*.jks
+*.p12
+
+# Locally provisioned test environments and SDKs
+.verification-sdk/
+
+# Logs and temporary working files
+*.log
+*.tmp
+*.lock
+tmp/
+output/
+
+# Python local caches and environment secrets
+__pycache__/
+*.py[cod]
+.env
+.env.*
+!.env.example
+
+# Operating-system files
+.DS_Store

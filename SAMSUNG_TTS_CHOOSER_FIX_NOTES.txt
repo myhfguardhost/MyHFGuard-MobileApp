@@ -1,0 +1,44 @@
+MyHFGuard - Samsung TTS chooser fix (2026-08-21)
+
+Problem
+-------
+On Samsung phones, MyHFGuard could unexpectedly show the Android system dialog:
+"Complete action using"
+with choices such as:
+- Samsung text-to-speech engine
+- Speech Recognition and Synthesis (Google)
+
+Cause
+-----
+FloatingAiNurse.kt automatically checked the selected app-language TTS voice as
+soon as TTS initialized. When the current TTS engine did not support that
+language, the app immediately launched ACTION_INSTALL_TTS_DATA without binding
+the intent to one TTS engine. Samsung therefore displayed an app chooser because
+multiple TTS engines could handle the request.
+
+Fix applied
+-----------
+1. MyHFGuard now prefers Google TTS (com.google.android.tts) when it is installed.
+2. The TTS voice installer is explicitly bound to the active/preferred TTS engine,
+   preventing the Samsung "Complete action using" chooser.
+3. The app no longer opens the TTS voice installer automatically when normal pages
+   such as Dashboard/Profile are opened.
+4. Missing voice data is handled only when speech is actually requested.
+5. Added com.google.android.tts to AndroidManifest.xml <queries> for package
+   visibility on recent Android versions.
+
+Files changed
+-------------
+app/src/main/java/com/vitalink/app/ui/screens/FloatingAiNurse.kt
+app/src/main/AndroidManifest.xml
+
+Important
+---------
+This build keeps the previous medication/profile save fix included in
+MyHFGuard_MEDICATION_PROFILE_SAVE_FIXED_2026-08-21.zip.
+
+Build validation
+----------------
+A Gradle compile was attempted, but the build environment could not download
+Gradle 8.7 from services.gradle.org because internet access is unavailable.
+The source changes are included in full for Android Studio compilation.

@@ -1,0 +1,3 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<instrumentation android:name="com.vitalink.app.VerificationInstrumentation" android:targetPackage="com.vitalink.app.verification" android:functionalTest="true" />
+</manifest>

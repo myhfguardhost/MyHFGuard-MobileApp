@@ -1,0 +1,39 @@
+MyHFGuard Custom Notification Sound Integration
+Date: 2026-08-21
+
+Audio files supplied in notification sound.zip were converted from MP4 (AAC + video)
+to audio-only MP3 files and placed in app/src/main/res/raw/.
+
+Sound mapping
+-------------
+appointment.mp4                  -> Appointment reminders
+blood pressure.mp4               -> Blood-pressure reminders and BP-related alerts
+education notification.mp4       -> Saturday heart-failure education reminder
+medicine.mp4                     -> 12 PM / 9 PM medication reminders
+refresh mi band data.mp4         -> 9 PM Mi Fitness/Mi Band refresh reminder when it is the only missing action
+remember to log all data.mp4     -> 9 PM reminder when multiple daily items are missing; fallback health-alert sound
+salt.mp4                         -> Salt reminder / salt-related alert
+symptom.mp4                      -> Symptom reminder / self-check symptom alert
+walk more and move around.mp4    -> 4 PM step-target reminder
+water.mp4                        -> Water reminder / fluid-intake alert
+weight.mp4                       -> Weight reminder / weight-related alert
+
+Android channel handling
+------------------------
+Android 8.0+ stores notification sound settings on NotificationChannel objects.
+NotificationSoundChannels.kt creates a separate, versioned channel per sound and
+importance level. This makes the custom sounds work reliably on Samsung and other
+Android phones even when older app versions previously created default-sound channels.
+
+9 PM reminder behavior
+----------------------
+- Exactly one missing item: play that item's specific sound.
+- Only Mi Band refresh missing: play the Mi Band refresh sound.
+- Two or more missing items: play the 'remember to log all data' sound once.
+This prevents multiple voice clips from playing at the same time.
+
+Important for testing
+---------------------
+Install this build and allow notification permission. Android users can still manually
+change a channel's sound in system Notification Settings; if they do, the system choice
+overrides the app default for that channel.

@@ -1,0 +1,73 @@
+Daily monitoring
+Daily weight not recorded
+“⚖️ Please record your weight today. Checking it at the same time each morning helps identify possible fluid buildup.”
+Weight recorded normally
+“✅ Your weight has been recorded. Continue monitoring it daily so changes can be noticed early.”
+Sudden weight increase
+“⚠️ Your weight has increased quickly. This may be caused by fluid buildup. Please check for swelling or breathing difficulty and contact your healthcare team.”
+Blood pressure not recorded
+“🩺 Remember to check your blood pressure today. Sit quietly for five minutes before taking the reading.”
+Blood pressure reading advice
+“Keep your feet flat, support your arm at heart level, and avoid talking while measuring your blood pressure.”
+Blood pressure higher than usual
+“⚠️ Your blood pressure is higher than your usual reading. Rest for a few minutes and measure it again.”
+Blood pressure very high
+“🚨 Your blood pressure is dangerously high. Please seek urgent medical advice, especially if you have chest pain, breathing difficulty, weakness, or severe headache.”
+Blood pressure low with symptoms
+“Your blood pressure is low. Sit or lie down safely. Please contact your healthcare provider if you feel dizzy, weak, confused, or faint.”
+Heart rate unusual
+“💓 Your heart rate is outside your usual range. Rest and check it again. Seek medical advice if it remains unusual or you feel unwell.”
+Low oxygen level
+“⚠️ Your oxygen level is low. Sit upright, rest, and check the reading again. Seek urgent help if you are struggling to breathe.”
+
+Daily tracking of weight, symptoms, swelling and breathing changes can help identify worsening heart failure earlier.
+
+Symptoms and feelings
+Mild shortness of breath
+“Please sit upright and rest. Avoid strenuous activity until your breathing returns to normal.”
+Severe shortness of breath
+“🚨 Severe or sudden breathing difficulty requires immediate medical attention. Please contact emergency services now.”
+Breathlessness when lying down
+“Breathing difficulty when lying flat may be important. Sit upright and contact your healthcare provider as soon as possible.”
+Chest pain
+“🚨 Chest pain or pressure may be an emergency. Stop your activity and seek immediate medical assistance.”
+Swollen feet or ankles
+“🦶 New or worsening swelling may indicate fluid buildup. Record your weight and contact your healthcare team if it continues.”
+Feeling dizzy
+“Sit or lie down to prevent falling. Stand up slowly and avoid walking alone until the dizziness improves.”
+Feeling very tired
+“Your body may need more rest today. Divide activities into smaller tasks and take breaks between them.”
+Vomited once
+“I’m sorry you’re feeling unwell. Rest and take small sips only if this follows your prescribed fluid plan. Monitor whether the vomiting happens again.”
+Repeated vomiting
+“Repeated vomiting can affect your fluids and medication. Please contact your healthcare provider, especially if you cannot keep medicine or food down.”
+Persistent cough
+“A new or worsening cough, especially at night or when lying down, should be monitored. Contact your healthcare provider if it continues.”
+
+Breathlessness, sudden weight gain, swelling, fatigue, dizziness, nausea and persistent coughing can be associated with worsening heart failure.
+
+Medication, diet and water
+Medication reminder
+“💊 It is time for your medication. Take it exactly as prescribed by your healthcare provider.”
+Missed medication
+“Do not take an extra dose unless your doctor or pharmacist has instructed you to. Check your medication instructions or contact them for advice.”
+User wants to stop medication
+“Please do not stop or change your medication by yourself, even if you feel better. Discuss any concerns or side effects with your healthcare provider.”
+Medication running low
+“Your medication may be running low. Arrange a refill early so you do not miss any doses.”
+High-salt meal recorded
+“🧂 This meal may contain a lot of salt. Choose lower-sodium foods for your next meal to help reduce fluid retention.”
+Healthy meal recorded
+“🥗 Good choice! A balanced, lower-salt meal supports better heart-health management.”
+Water intake approaching limit
+“💧 You are approaching your daily fluid target. Remember that drinks, soup, ice and watery desserts may also count.”
+User asks how much water to drink
+“Your fluid limit should follow your healthcare provider’s instructions. I should not increase or reduce it without your personalised care plan.”
+
+Heart-failure treatment commonly includes prescribed medication and individual guidance about sodium and fluid intake; limits should be personalised by the healthcare team.
+
+Exercise and follow-up
+Steps below target
+“🚶 You are below your step target today. Try a gentle walk or light movement if you feel well and your healthcare provider allows it.”
+Symptoms during exercise
+“Stop exercising and rest if you experience chest pain, severe breathlessness, dizziness, weakness, or an unusual heartbeat. Seek medical help if symptoms do not improve.”

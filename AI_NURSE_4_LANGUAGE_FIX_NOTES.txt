@@ -1,0 +1,28 @@
+MyHFGuard AI Nurse — 4 Language Build
+Date: 2026-08-20
+
+Included fixes:
+1. AI Nurse follows the selected MyHFGuard app language for English, Bahasa Melayu, Mandarin Chinese, and Tamil.
+2. Voice recognition locale follows the selected app language.
+3. Gemini reply mode follows the selected app language instead of auto-detecting the spoken sentence.
+4. Text-to-Speech voice locale follows the same selected language.
+5. Nurse greeting and conversation reset correctly when app language changes.
+6. One-word/short follow-up replies keep the selected language.
+7. Added a language anchor for compatibility with the existing Node/Render AI route.
+8. Updated the bundled Node route patch to honor the explicit request.language field.
+9. AI Nurse remains hidden on the My AI chatbot page.
+10. The earlier Compose weight import build error remains fixed (no internal layout.weight import).
+
+Expected behavior:
+English app -> English mic / Gemini reply / TTS
+Bahasa Melayu app -> Malay mic / Gemini reply / TTS
+中文 app -> Mandarin mic / Gemini reply / TTS
+தமிழ் app -> Tamil mic / Gemini reply / TTS
+
+Note: TTS voice availability depends on the Android phone. If text appears correctly but speech is unavailable for a language, install/update the corresponding Speech Services / TTS voice on the phone.
+11. The uploaded archive did not contain the root Gradle project files. Standard settings.gradle.kts, root build.gradle.kts, gradle.properties, gradlew, and gradlew.bat were restored using the versions already declared by this project (Gradle wrapper 8.7 / AGP 8.6.0).
+
+Validation performed in this environment:
+- Node AI route patch: JavaScript syntax check passed.
+- FastAPI backend Python syntax check passed.
+- Kotlin/Android full compile was started, but this sandbox has no network access to download the Gradle 8.7 distribution (UnknownHostException). Android Studio on a normal connected PC can download it and perform the full build.

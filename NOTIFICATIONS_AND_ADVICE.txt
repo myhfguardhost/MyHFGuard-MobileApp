@@ -1,0 +1,152 @@
+MyHFGuard — Notification and Dashboard Advice Guide
+Updated 6 September 2026
+
+REMAINING PHONE NOTIFICATIONS
+
+1. Medication: 12:00 PM and 9:00 PM (Malaysia time).
+   Only medicines assigned to that period appear. A noon-only medicine never
+   appears in the night reminder, and a night-only medicine never appears at noon.
+   Medicines marked both appear in both. No reminder is sent for an empty list.
+   Old 10 AM entries are treated as noon; old 10 PM entries as 9 PM.
+   Profile medicine entries override matching older medicine-table entries.
+   Explicit medication schedules take precedence over the medicine table's timing.
+   Inactive table medicines are excluded. A profile line without a time defaults
+   to noon, matching the profile's existing convention; unknown explicit times
+   are not scheduled automatically.
+   The alarm targets the exact time; Android battery restrictions can delay it.
+   A WorkManager fallback operates during the scheduled hour. Delayed jobs outside
+   that hour are skipped so a noon reminder cannot arrive at night.
+   Reminders are deduplicated per patient/date/period. Tapping opens Dashboard.
+
+2. Immediate blood pressure/pulse alerts after a successful Self-Check BP save.
+   RED: SYS >=180 or <80 mmHg; DIA >=120 or <50 mmHg;
+        pulse <50 or >150 bpm.
+   YELLOW (when no red rule matches): SYS >=140; DIA >=90;
+        pulse <60 or >100 bpm.
+   Tapping opens Dashboard. Yellow alerts can repeat after another saved reading.
+
+3. Immediate symptom alerts after a successful Self-Check symptom save.
+   Each of the five symptoms has a score of 0–5; severe means >=4.
+   RED: at least three severe symptoms OR total score >=20/25.
+   YELLOW: at least one severe symptom OR total score >=12/25, without red.
+   Tapping opens Dashboard. Yellow alerts can repeat after another saved entry.
+
+4. Background health alerts: checked approximately every hour.
+   Runs for the signed-in patient, using today's available records.
+   RED conditions:
+   - SYS >=180 or <80; DIA >=120 or <50 mmHg.
+   - Pulse or smart-band heart rate <50 or >150 bpm.
+   - SpO2 <90%.
+   - At least three symptoms scored >=4 today.
+   - At least two severe symptoms on each of three consecutive days.
+   - Water intake > prescribed limit +200 ml.
+   - Weight gain >=3 kg since the previous reading, OR >=3 kg compared with
+     the most recent reading at least two days earlier.
+   - Today's weight >=5 kg above the patient's dry-weight baseline.
+   YELLOW conditions (if no red condition is present):
+   - SYS 121–179; DIA 80–119 mmHg.
+   - Pulse or heart rate <60 or >100 bpm; SpO2 <95%.
+   - At least one severe symptom, or at least two symptoms scored >=3.
+   - Water intake above the prescribed limit by up to 200 ml.
+   - Salt score >=7/9, or a stored red salt status.
+   - Weight gain >=1.5 kg since the previous reading, OR >=2 kg compared with
+     the most recent reading at least two days earlier.
+   - Today's weight >=3 kg above the patient's dry-weight baseline.
+   Only available measurements are evaluated. Missing inputs do not generate
+   phone reminders. Background yellow alerts repeat when the recorded reasons
+   change, rather than repeating the identical last alert every hour.
+
+5. Dashboard red alert: when Dashboard evaluates a red condition and its
+   alert state/reasons change, including when Dashboard is opened.
+   Uses the existing dashboard AlertEngine:
+   SYS >=180 or <80; DIA >=120 or <50; pulse/heart rate <50 or >120;
+   SpO2 <90%; recent weight gain >=3 kg; or weight >=5 kg over baseline.
+   This is a phone alert; the coloured dashboard status itself is also retained.
+
+EXISTING ALERT DIFFERENCES TO BE AWARE OF
+The existing immediate/background notifications share a one-red-alert-per-patient-
+per-day gate. The existing Dashboard red notification uses its own path and can
+repeat. Dashboard pulse/heart-rate red thresholds use >120, while immediate and
+background notifications use >150. Immediate BP yellow starts at 140/90; the
+background check also includes 121–139 SYS and 80–89 DIA. These existing clinical
+thresholds were preserved in this enhancement.
+Salt's red graph/status category starts at 7/9, but the existing background salt
+phone notification is YELLOW. A red graph label does not change that policy.
+Health workers use the phone's calendar day; medication/appointment timing uses
+Malaysia time. Android notification permission, channel settings, connectivity,
+and background execution affect whether/when a phone notification is delivered.
+
+REMOVED PHONE NOTIFICATIONS
+- Appointment reminders (appointments remain available on their page).
+- Missing daily weight, BP, symptoms, water, salt or band refresh reminders.
+- Steps/4 PM prompts.
+- Saturday education prompts.
+Previously scheduled jobs are cancelled or finish without sending a reminder.
+Old non-health/non-medication entries are hidden from notification history.
+
+DASHBOARD CHECKLIST AND APPOINTMENTS
+- Medicine tick boxes appear only from 12:00:00–12:59:59 and
+  21:00:00–21:59:59 Malaysia time, when at least one medicine is due.
+- Tick only after taking that medicine. Unticking is supported.
+- Ticks are saved locally on this device, separately for patient/date/period/
+  medicine/dose. Noon ticks do not tick the night dose. A new date starts unticked.
+  These ticks are not uploaded to the administrator or synced between devices.
+- Appointment cards appear from 30 minutes before the scheduled appointment
+  through its scheduled start. They are hidden at other times, with no empty card.
+  Both appointment-table and appointment-type reminder records are supported.
+- The dashboard clock updates while open; health data refreshes on resume/day change.
+
+CLICKABLE MISSING-ENTRY ADVICE
+These entries appear together whenever today's data is absent, with no phone alert.
+- Missing weight -> Self-Check.
+- Missing BP -> Self-Check.
+- Missing symptoms -> Self-Check.
+- Missing water -> Water & Salt.
+- Missing salt -> Water & Salt.
+- No recorded/synced steps today -> Exercise.
+The item disappears after the record is saved and Dashboard refreshes.
+
+TODAY'S HEALTH ADVICE CARD
+The first matching condition below is shown, in this priority order. Every card
+opens its related page. Missing-entry advice remains visible separately.
+1. SYS >=180 or DIA >=120 -> very high BP advice -> Vitals.
+2. Activity breathlessness or difficulty lying flat score >=4
+   -> severe breathing advice -> Self-Check.
+3. SpO2 <90% -> low oxygen advice -> Smart Band.
+4. Recent weight gain >=1.5 kg -> weight increase advice -> Self-Check.
+5. SYS <80 or DIA <50, together with any symptom score >=2
+   -> low blood pressure advice -> Vitals.
+6. Heart rate <60 or >100 bpm -> heart-rate advice -> Smart Band.
+7. SYS >=140, DIA >=90, or SYS >=baseline +20
+   -> BP higher than usual -> Vitals.
+8. Difficulty lying flat >=2 -> breathing advice -> Self-Check.
+9. Leg swelling >=2 -> swelling advice -> Self-Check.
+10. Activity breathlessness 1–3 -> mild breathlessness advice -> Self-Check.
+11. Cough >=2 -> cough advice -> Self-Check.
+12. Water intake >=80% of the prescribed limit -> approaching-limit advice
+    -> Water & Salt.
+13. Red salt status or salt score >=7 -> high-salt advice -> Water & Salt.
+14. Steps below the patient's target, with today's weight and BP already saved
+    -> step-target advice -> Exercise.
+15. Green salt status with a recorded salt score -> healthy-meal advice
+    -> Water & Salt.
+16. Otherwise -> daily-monitoring advice -> Self-Check.
+
+GRAPHS
+Self-Check now has four graphs: weight, SYS+DIA, pulse, and symptom alert level.
+- Weight: dashed patient dry-weight baseline, labelled in kg.
+- SYS+DIA: two reading lines plus separate labelled patient SYS/DIA baselines.
+- Pulse: separate graph with the patient's heart-rate baseline in bpm.
+- Symptoms: green/yellow/red bands plot the recorded alert level rather than
+  assuming that a total symptom score alone describes risk.
+  Red = any existing immediate or background red symptom condition.
+  Yellow = any existing immediate or background yellow symptom condition.
+  Green = none of those conditions. Recorded zero is valid; no entry is not zero.
+- Water: dashed prescribed limit follows each record's saved limit in ml.
+- Salt: labelled threshold at 7/9, where the existing salt status turns red.
+No patient baseline is invented when the profile cannot be loaded.
+
+TODAY'S OVERVIEW
+Open Read today's overview for a large-text screen, then Read aloud to speak it.
+Stop reading and Close stop speech. Uses the selected app language when that
+voice is installed on the phone. Missing today's weight/BP is spoken as missing.
