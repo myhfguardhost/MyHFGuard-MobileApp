@@ -17,6 +17,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.vitalink.app.data.model.PatientNotification
 import com.vitalink.app.navigation.Route
+import com.vitalink.app.util.MalaysiaDateTime
 import java.time.Instant
 import java.util.concurrent.TimeUnit
 
@@ -28,15 +29,38 @@ class AdminNotificationWorker(appContext: Context, params: WorkerParameters) : C
         return try {
             val response = auth.api.getPatientNotifications("eq.${auth.patientId}")
             if (!response.isSuccessful) return Result.retry()
-            response.body().orEmpty().filter(::isDue).forEach { showOnce(context, auth.patientId, it) }
+            response.body().orEmpty()
+                .filterNot { it.notification_type in APP_OWNED_TYPES }
+                .filter(::isDue)
+                .filterNot(::isStaleAutomaticReminder)
+                .forEach { showOnce(context, auth.patientId, it) }
             Result.success()
         } catch (_: Exception) { Result.retry() }
     }
 
     private fun isDue(row: PatientNotification): Boolean {
-        val scheduled = row.scheduled_for.orEmpty()
-        return scheduled.isBlank() || runCatching { !Instant.parse(scheduled).isAfter(Instant.now()) }.getOrDefault(true)
+        val scheduled = originalTime(row) ?: return true
+        return !scheduled.isAfter(Instant.now())
     }
+
+    /**
+     * The server stores one automatic reminder per day. When the app was closed
+     * for days, every old one used to appear at once with the same time, so a
+     * reminder from an earlier day is no longer shown. Care-team messages are
+     * always kept.
+     */
+    private fun isStaleAutomaticReminder(row: PatientNotification): Boolean {
+        if (row.notification_type !in AUTOMATIC_TYPES) return false
+        val day = row.notification_date?.take(10)
+            ?: originalTime(row)?.atZone(MalaysiaDateTime.zoneId)?.toLocalDate()?.toString()
+            ?: return false
+        return day != MalaysiaDateTime.today().toString()
+    }
+
+    /** When the server meant the message to appear, so a late delivery still shows its real time. */
+    private fun originalTime(row: PatientNotification): Instant? =
+        (MalaysiaDateTime.parseTimestamp(row.scheduled_for) ?: MalaysiaDateTime.parseTimestamp(row.created_at))
+            ?.atZone(MalaysiaDateTime.zoneId)?.toInstant()
 
     private fun showOnce(context: Context, patientId: String, row: PatientNotification) {
         val identity = row.id.ifBlank { row.dedupe_key.orEmpty() }
@@ -45,11 +69,12 @@ class AdminNotificationWorker(appContext: Context, params: WorkerParameters) : C
         val key = "$patientId|$identity"
         val title = row.title?.trim().takeUnless { it.isNullOrBlank() } ?: "Message from your care team"
         val message = row.message?.trim().takeUnless { it.isNullOrBlank() } ?: "You have a new message from your care team."
+        val sentAt = originalTime(row) ?: Instant.now()
         // History is independent of Android permission and previous tray delivery.
         // A separate marker backfills older deliveries once without restoring cleared history.
         val historyKey = "history|$key"
         if (!prefs.getBoolean(historyKey, false)) {
-            NotificationHistoryStore.record(context, title, message, Route.Dashboard.path)
+            NotificationHistoryStore.record(context, title, message, Route.Dashboard.path, sentAt)
             prefs.edit().putBoolean(historyKey, true).apply()
         }
         if (prefs.getBoolean(key, false)) return
@@ -69,6 +94,7 @@ class AdminNotificationWorker(appContext: Context, params: WorkerParameters) : C
             .setContentTitle(title).setContentText(message)
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setWhen(sentAt.toEpochMilli()).setShowWhen(true)
             .setSound(NotificationSoundChannels.soundUri(context, NotificationSoundChannels.Sound.LOG_ALL_DATA))
             .setContentIntent(NotificationNavigation.pendingIntent(context, Route.Dashboard.path, notificationId))
             .setAutoCancel(true).build()
@@ -85,6 +111,10 @@ class AdminNotificationWorker(appContext: Context, params: WorkerParameters) : C
         private const val PERIODIC_WORK = "admin_patient_messages"
         private const val IMMEDIATE_WORK = "admin_patient_messages_now"
         private const val PREFS = "admin_patient_messages_seen"
+        /** Daily reminders the server creates by itself (not typed by the care team). */
+        private val AUTOMATIC_TYPES = setOf("low_steps", "incomplete_vitals")
+        /** The app already sends its own daily step reminder, so the server copy would be a duplicate. */
+        private val APP_OWNED_TYPES = setOf("low_steps")
         fun schedule(context: Context) {
             WorkManager.getInstance(context.applicationContext).enqueueUniquePeriodicWork(PERIODIC_WORK, ExistingPeriodicWorkPolicy.UPDATE, PeriodicWorkRequestBuilder<AdminNotificationWorker>(15, TimeUnit.MINUTES).build())
         }

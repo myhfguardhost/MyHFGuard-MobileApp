@@ -48,6 +48,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.draw.drawWithContent
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -895,10 +899,11 @@ fun DashboardScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text(
+                        // One line in every language: long Malay/Tamil greetings shrink
+                        // instead of wrapping, so the top bar keeps the same height.
+                        SingleLineShrinkText(
                             "$greetingEmoji $greeting${if (s.firstName.isNotBlank()) ", ${s.firstName}" else ""}!",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                         )
 
                         Text(
@@ -3007,4 +3012,35 @@ private fun openHealthConnectSettings(context: Context) {
             // try next
         }
     }
+}
+
+/**
+ * Shows the whole [text] on one line, never with "…". When it is too wide,
+ * the font shrinks step by step until it fits (not below [minFontSize]).
+ */
+@Composable
+private fun SingleLineShrinkText(
+    text: String,
+    style: TextStyle,
+    minFontSize: TextUnit = 6.sp
+) {
+    var fontSize by remember(text, style) { mutableStateOf(style.fontSize) }
+    var fitted by remember(text, style) { mutableStateOf(false) }
+    Text(
+        text,
+        style = style.copy(fontSize = fontSize),
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Clip,
+        // Hide the in-between sizes so the patient never sees the text jump.
+        modifier = Modifier.drawWithContent { if (fitted) drawContent() },
+        onTextLayout = { result ->
+            val smaller = fontSize * 0.9f
+            if (result.didOverflowWidth && smaller.value >= minFontSize.value) {
+                fontSize = smaller
+            } else {
+                fitted = true
+            }
+        }
+    )
 }
