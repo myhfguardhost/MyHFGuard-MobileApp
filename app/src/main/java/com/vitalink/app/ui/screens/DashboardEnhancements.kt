@@ -119,8 +119,22 @@ internal fun UnifiedTodayAdvice(state: DashState, now: LocalDateTime, healthTitl
             medicineGroups.forEach { (group, medicines) ->
                 val (doseDate, slot) = group
                 HorizontalDivider()
-                Text("💊 " + if (slot == MedicationTiming.NIGHT) AppLanguage.text("Night medicines", "Ubat malam", "晚间用药", "இரவு மருந்துகள்")
-                    else AppLanguage.text("Noon medicines", "Ubat tengah hari", "午间用药", "மதிய மருந்துகள்"), fontWeight = FontWeight.Bold)
+                Text(
+                    "💊 " + AppLanguage.text(
+                        "Have you taken your medication?",
+                        "Adakah anda sudah mengambil ubat?",
+                        "您服药了吗？",
+                        "உங்கள் மருந்தை எடுத்துக்கொண்டீர்களா?"
+                    ),
+                    fontWeight = FontWeight.Bold
+                )
+                // Small hint so noon and night lists can be told apart when both are shown.
+                Text(
+                    if (slot == MedicationTiming.NIGHT) AppLanguage.text("Night · 9pm", "Malam · 9pm", "晚上 · 9pm", "இரவு · 9pm")
+                    else AppLanguage.text("Noon · 12pm", "Tengah hari · 12pm", "中午 · 12pm", "மதியம் · 12pm"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 if (doseDate != today.toString()) {
                     Text(
                         AppLanguage.text("Checklist date: ", "Tarikh senarai semak: ", "用药记录日期：", "சரிபார்ப்புப் பட்டியல் தேதி: ") + doseDate,

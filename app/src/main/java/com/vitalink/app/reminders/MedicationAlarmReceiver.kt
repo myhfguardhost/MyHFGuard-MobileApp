@@ -14,16 +14,29 @@ class MedicationAlarmReceiver : BroadcastReceiver() {
         // clock and timezone changes only need to rebuild the next alarms, but
         // checking now also covers a device that was restarted during a slot.
         SystemReminderWorker.checkNow(appContext)
+        // Care-team messages are fetched at the same moments, so they do not wait
+        // for Android's slower 15-minute background schedule.
+        AdminNotificationWorker.checkNow(appContext)
         schedule(appContext)
     }
     companion object {
         private const val ACTION = "com.vitalink.app.MEDICATION_ALARM"
         private const val NOON_ID = 5101
         private const val NIGHT_ID = 5102
+        private const val STEPS_ID = 5103
+        private const val DAILY_LOG_ID = 5104
 
+        /**
+         * Daily alarms that wake the app at each reminder time, even when it is
+         * closed: 5pm steps, 6pm weight/BP/symptom/water/salt, and 12pm/9pm to fetch
+         * care-team messages. Medicines are not notified; they are ticked in
+         * Today's Advice. The reminder check itself decides what is still missing.
+         */
         fun schedule(context: Context) {
             val manager = context.getSystemService(AlarmManager::class.java) ?: return
             scheduleOne(context, manager, NOON_ID, 12)
+            scheduleOne(context, manager, STEPS_ID, 17)
+            scheduleOne(context, manager, DAILY_LOG_ID, 18)
             scheduleOne(context, manager, NIGHT_ID, 21)
         }
 
@@ -57,7 +70,7 @@ class MedicationAlarmReceiver : BroadcastReceiver() {
         }
 
         fun cancel(context: Context) {
-            listOf(NOON_ID, NIGHT_ID).forEach { id ->
+            listOf(NOON_ID, NIGHT_ID, STEPS_ID, DAILY_LOG_ID).forEach { id ->
                 val intent = Intent(context, MedicationAlarmReceiver::class.java).apply { action = ACTION }
                 PendingIntent.getBroadcast(context,id,intent,PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE)?.let { context.getSystemService(AlarmManager::class.java).cancel(it); it.cancel() }
             }

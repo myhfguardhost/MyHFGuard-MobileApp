@@ -103,7 +103,7 @@ interface ApiService {
     suspend fun updateBpReadingById(
         @Query(value = "id", encoded = true) id: String,
         @Body body: Map<String, @JvmSuppressWildcards Any?>
-    ): Response<Unit>
+    ): Response<List<BpEvent>>
 
     @Headers("Prefer: return=representation")
     @PATCH("bp_readings")
@@ -111,7 +111,7 @@ interface ApiService {
         @Query(value = "patient_id", encoded = true) patientId: String,
         @Query(value = "reading_date", encoded = true) readingDate: String,
         @Body body: Map<String, @JvmSuppressWildcards Any?>
-    ): Response<Unit>
+    ): Response<List<BpEvent>>
 
     @GET("symptom_log")
     suspend fun getSymptomLogs(@Query(value = "patient_id", encoded = true) patientId: String, @Query(value = "order", encoded = true) order: String = "created_at.desc"): Response<List<SymptomLog>>

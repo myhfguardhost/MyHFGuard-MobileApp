@@ -1,5 +1,6 @@
 package com.vitalink.app.ui.screens
 
+import com.vitalink.app.reminders.LocalizedNotificationText
 import com.vitalink.app.util.UserFacingError
 import com.vitalink.app.util.UserFacingError.Action
 
@@ -92,14 +93,15 @@ class LoginViewModel @Inject constructor(
         .retryOnConnectionFailure(true)
         .build()
 
-    private val _passwordHelp = MutableStateFlow<String?>(null)
+    // Kept in all four languages so the message follows a later language switch.
+    private val _passwordHelp = MutableStateFlow<LocalizedNotificationText?>(null)
     val passwordHelp = _passwordHelp.asStateFlow()
     private val _requestingHelp = MutableStateFlow(false)
     val requestingHelp = _requestingHelp.asStateFlow()
     fun requestPasswordHelp(userId: String) = viewModelScope.launch {
         if (_requestingHelp.value) return@launch
         if (userId.isBlank()) {
-            _passwordHelp.value = AppLanguage.text("Enter your User ID first.", "Masukkan ID Pengguna dahulu.", "请先输入用户 ID。", "முதலில் பயனர் ID-ஐ உள்ளிடுங்கள்.")
+            _passwordHelp.value = LocalizedNotificationText("Enter your User ID first.", "Masukkan ID Pengguna dahulu.", "请先输入用户 ID。", "முதலில் பயனர் ID-ஐ உள்ளிடுங்கள்.")
             return@launch
         }
         _requestingHelp.value = true
@@ -109,10 +111,10 @@ class LoginViewModel @Inject constructor(
                 val request = Request.Builder().url(BuildConfig.API_BASE_URL.trimEnd('/') + "/api/patient/password-help").post(body).build()
                 authClient.newCall(request).execute().use { it.isSuccessful }
             }
-            _passwordHelp.value = if (success) AppLanguage.text("If your User ID is registered, your administrator will receive your password-help request.", "Jika ID anda berdaftar, pentadbir akan menerima permintaan bantuan kata laluan anda.", "如果用户 ID 已注册，管理员将收到您的密码协助请求。", "உங்கள் ID பதிவு செய்யப்பட்டிருந்தால், நிர்வாகி கடவுச்சொல் உதவிக் கோரிக்கையைப் பெறுவார்.")
-                else AppLanguage.text("Unable to send the request. Please try later or contact your administrator.", "Permintaan gagal dihantar. Cuba lagi atau hubungi pentadbir.", "无法发送请求，请稍后重试或联系管理员。", "கோரிக்கையை அனுப்ப முடியவில்லை. பின்னர் முயலவும் அல்லது நிர்வாகியை தொடர்புகொள்ளவும்.")
+            _passwordHelp.value = if (success) LocalizedNotificationText("If your User ID is registered, your administrator will receive your password-help request.", "Jika ID anda berdaftar, pentadbir akan menerima permintaan bantuan kata laluan anda.", "如果用户 ID 已注册，管理员将收到您的密码协助请求。", "உங்கள் ID பதிவு செய்யப்பட்டிருந்தால், நிர்வாகி கடவுச்சொல் உதவிக் கோரிக்கையைப் பெறுவார்.")
+                else LocalizedNotificationText("Unable to send the request. Please try later or contact your administrator.", "Permintaan gagal dihantar. Cuba lagi atau hubungi pentadbir.", "无法发送请求，请稍后重试或联系管理员。", "கோரிக்கையை அனுப்ப முடியவில்லை. பின்னர் முயலவும் அல்லது நிர்வாகியை தொடர்புகொள்ளவும்.")
         } catch (_: Exception) {
-            _passwordHelp.value = AppLanguage.text("Check your connection and try again.", "Semak sambungan dan cuba lagi.", "请检查网络后重试。", "இணைப்பைச் சரிபார்த்து மீண்டும் முயலவும்.")
+            _passwordHelp.value = LocalizedNotificationText("Check your connection and try again.", "Semak sambungan dan cuba lagi.", "请检查网络后重试。", "இணைப்பைச் சரிபார்த்து மீண்டும் முயலவும்.")
         } finally { _requestingHelp.value = false }
     }
 
@@ -559,7 +561,7 @@ fun LoginScreen(
                     TextButton(onClick = { vm.requestPasswordHelp(userId) }, enabled = !requestingHelp, modifier = Modifier.fillMaxWidth()) {
                         Text(AppLanguage.text("Forgot password? Ask admin for help", "Lupa kata laluan? Minta bantuan pentadbir", "忘记密码？请求管理员协助", "கடவுச்சொல் மறந்துவிட்டதா? நிர்வாகியின் உதவியைப் பெறுங்கள்"))
                     }
-                    passwordHelp?.let { Text(it, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) }
+                    passwordHelp?.let { Text(it.resolve(), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) }
                     Spacer(Modifier.height(12.dp))
 
                     Text(

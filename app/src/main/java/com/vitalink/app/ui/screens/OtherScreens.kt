@@ -1,5 +1,6 @@
 package com.vitalink.app.ui.screens
 
+import com.vitalink.app.BuildConfig
 import com.vitalink.app.util.UserFacingError
 import com.vitalink.app.util.UserFacingError.Action
 
@@ -54,6 +55,8 @@ import com.vitalink.app.data.api.SessionManager
 import com.vitalink.app.data.api.ServerApiService
 import com.vitalink.app.data.model.*
 import com.vitalink.app.util.AppLanguage
+import com.vitalink.app.util.MalaysiaDateTime
+import com.vitalink.app.reminders.LocalizedNotificationText
 import com.vitalink.app.reminders.SelfCheckAlertNotifier
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -1688,13 +1691,8 @@ class SelfCheckViewModel @Inject constructor(
             _msg.value = AppLanguage.text("Please login again.", "Sila log masuk semula.", "请重新登录。", "மீண்டும் உள்நுழையவும்.")
             return@launch
         }
-        if (sys !in 0..260 || dia !in 0..160 || pulse !in 0..220 || sys <= dia) {
-            _msg.value = AppLanguage.text(
-                "Please enter valid SYS, DIA and Pulse values. SYS must be higher than DIA.",
-                "Sila masukkan nilai SYS, DIA dan Nadi yang sah. SYS mesti lebih tinggi daripada DIA.",
-                "请输入有效的 SYS、DIA 和脉搏数值，SYS 必须高于 DIA。",
-                "சரியான SYS, DIA மற்றும் நாடித்துடிப்பு மதிப்புகளை உள்ளிடவும். SYS, DIA-வை விட அதிகமாக இருக்க வேண்டும்."
-            )
+        findVitalsProblem(sys, dia, pulse)?.let { (_, problem) ->
+            _msg.value = problem.resolve()
             return@launch
         }
 
@@ -1719,6 +1717,16 @@ class SelfCheckViewModel @Inject constructor(
             val existing = _bpHistory.value.firstOrNull {
                 it.reading_date == date || it.recorded_at?.take(10) == date
             }
+            suspend fun addNewReading() = serverApi.addManualBp(
+                ServerBpManualRequest(
+                    value1 = sys,
+                    value2 = dia,
+                    value3 = pulse,
+                    patientId = pid,
+                    timeTs = "${date}T$nowTime"
+                )
+            )
+            var duplicateReading = false
             val saved = if (existing != null) {
                 val body = mapOf<String, Any?>(
                     "systolic" to sys,
@@ -1732,17 +1740,30 @@ class SelfCheckViewModel @Inject constructor(
                 } else {
                     api.updateBpReadingByDate("eq.$pid", "eq.$date", body)
                 }
-                response.isSuccessful
+                when {
+                    !response.isSuccessful -> false
+                    // Supabase answers "OK" even when its access rules changed no row,
+                    // so only a returned row proves the update. Otherwise the new
+                    // reading is saved as the day's latest, the way weight works.
+                    !response.body().isNullOrEmpty() -> true
+                    else -> {
+                        val added = addNewReading()
+                        duplicateReading = added.code() == 400 &&
+                            added.errorBody()?.string().orEmpty().contains("Duplicate", ignoreCase = true)
+                        added.isSuccessful
+                    }
+                }
             } else {
-                serverApi.addManualBp(
-                    ServerBpManualRequest(
-                        value1 = sys,
-                        value2 = dia,
-                        value3 = pulse,
-                        patientId = pid,
-                        timeTs = "${date}T$nowTime"
-                    )
-                ).isSuccessful
+                addNewReading().isSuccessful
+            }
+            if (duplicateReading) {
+                _msg.value = AppLanguage.text(
+                    "Not saved: SYS, DIA and pulse are all within 5 of today's earlier reading. Change a number by more than 5, or keep the earlier reading.",
+                    "Tidak disimpan: SYS, DIA dan nadi semuanya dalam lingkungan 5 daripada bacaan awal hari ini. Ubah satu nombor lebih daripada 5, atau kekalkan bacaan awal.",
+                    "未保存：SYS、DIA 和脉搏都与今天较早的读数相差不到 5。请把其中一个数字改动超过 5，或保留较早的读数。",
+                    "சேமிக்கப்படவில்லை: SYS, DIA மற்றும் நாடித்துடிப்பு இன்றைய முந்தைய அளவிலிருந்து 5-க்குள் உள்ளன. ஒரு எண்ணை 5-க்கு மேல் மாற்றவும், அல்லது முந்தைய அளவை வைத்துக்கொள்ளவும்."
+                )
+                return@launch
             }
             if (!saved) {
                 _msg.value = AppLanguage.text(
@@ -1814,6 +1835,9 @@ fun SelfCheckFullScreen(onBack: () -> Unit, focus: String? = null, vm: SelfCheck
     var sys by remember { mutableStateOf("") }
     var dia by remember { mutableStateOf("") }
     var pulse by remember { mutableStateOf("") }
+    // The field the patient must fix, shown directly under that field.
+    var vitalsProblem by remember { mutableStateOf<Pair<VitalField, LocalizedNotificationText>?>(null) }
+    var weightProblem by remember { mutableStateOf<LocalizedNotificationText?>(null) }
     var localOcrLoadingLabel by remember { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
 
@@ -1911,32 +1935,37 @@ fun SelfCheckFullScreen(onBack: () -> Unit, focus: String? = null, vm: SelfCheck
                 Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(AppLanguage.text("Vital Tracker", "Penjejak Vital"), fontWeight = FontWeight.Bold)
-                        // Healthy choices appear first; low patient readings remain selectable down to zero.
+                        // Same safe ranges as the Profile baseline, so a reading of 0 cannot be chosen.
                         NumberRollFieldSimple(
                             value = sys,
-                            values = ((0..79) + (80..139) + (140..260)).toList(),
+                            values = VitalLimits.SYS.toList(),
                             label = "SYS",
-                            onChange = { sys = it.toString() }
+                            onChange = { sys = it.toString(); vitalsProblem = null }
                         )
+                        FieldProblemText(vitalsProblem?.takeIf { it.first == VitalField.SYS }?.second)
 
                         NumberRollFieldSimple(
                             value = dia,
-                            values = ((0..49) + (50..89) + (90..160)).toList(),
+                            values = VitalLimits.DIA.toList(),
                             label = "DIA",
-                            onChange = { dia = it.toString() }
+                            onChange = { dia = it.toString(); vitalsProblem = null }
                         )
+                        FieldProblemText(vitalsProblem?.takeIf { it.first == VitalField.DIA }?.second)
 
                         NumberRollFieldSimple(
                             value = pulse,
-                            values = ((0..59) + (60..100) + (101..220)).toList(),
+                            values = VitalLimits.PULSE.toList(),
                             label = AppLanguage.text("Pulse", "Nadi / Pulse"),
-                            onChange = { pulse = it.toString() }
+                            onChange = { pulse = it.toString(); vitalsProblem = null }
                         )
+                        FieldProblemText(vitalsProblem?.takeIf { it.first == VitalField.PULSE }?.second)
                         BloodPressureMachineScanButtons(
                             onBloodPressureDetected = { detectedSys, detectedDia, detectedPulse ->
                                 sys = detectedSys.toString()
                                 dia = detectedDia.toString()
                                 pulse = detectedPulse.toString()
+                                // A misread scan is flagged at once, under the wrong value.
+                                vitalsProblem = findVitalsProblem(detectedSys, detectedDia, detectedPulse)
                             },
                             onMessage = { },
                             onSmartFallback = vm::smartScanBloodPressure,
@@ -1952,12 +1981,13 @@ fun SelfCheckFullScreen(onBack: () -> Unit, focus: String? = null, vm: SelfCheck
                             }
                         )
                         Button(
-                            onClick = { vm.saveVitals(date, sys.toIntOrNull() ?: 0, dia.toIntOrNull() ?: 0, pulse.toIntOrNull() ?: 0) },
-                            enabled = savingLabel == null &&
-                                (sys.toIntOrNull() ?: -1) in 0..260 &&
-                                (dia.toIntOrNull() ?: -1) in 0..160 &&
-                                (pulse.toIntOrNull() ?: -1) in 0..220 &&
-                                (sys.toIntOrNull() ?: 0) > (dia.toIntOrNull() ?: 0),
+                            onClick = {
+                                vitalsProblem = findVitalsProblem(sys.toIntOrNull(), dia.toIntOrNull(), pulse.toIntOrNull())
+                                if (vitalsProblem == null) {
+                                    vm.saveVitals(date, sys.toInt(), dia.toInt(), pulse.toInt())
+                                }
+                            },
+                            enabled = savingLabel == null,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
@@ -1975,7 +2005,15 @@ fun SelfCheckFullScreen(onBack: () -> Unit, focus: String? = null, vm: SelfCheck
                 Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(AppLanguage.text("Daily Weight (kg)", "Berat Harian (kg)"), fontWeight = FontWeight.Bold)
-                        OutlinedTextField(weight, { weight = it.filter { c -> c.isDigit() || c == '.' } }, Modifier.fillMaxWidth(), label = { Text(AppLanguage.text("Type your weight (kg)", "Taip berat anda (kg)")) }, singleLine = true)
+                        OutlinedTextField(
+                            weight,
+                            { weight = it.filter { c -> c.isDigit() || c == '.' }; weightProblem = null },
+                            Modifier.fillMaxWidth(),
+                            label = { Text(AppLanguage.text("Type your weight (kg)", "Taip berat anda (kg)")) },
+                            singleLine = true,
+                            isError = weightProblem != null,
+                            supportingText = weightProblem?.let { problem -> { Text(problem.resolve()) } }
+                        )
                         WeightMachineScanButtons(
                             onWeightDetected = { detected -> weight = String.format(Locale.US, "%.2f", detected).trimEnd('0').trimEnd('.') },
                             onMessage = { },
@@ -1992,8 +2030,19 @@ fun SelfCheckFullScreen(onBack: () -> Unit, focus: String? = null, vm: SelfCheck
                             }
                         )
                         Button(
-                            onClick = { weight.toDoubleOrNull()?.let { vm.saveWeight(date, it) } },
-                            enabled = savingLabel == null && (weight.toDoubleOrNull() ?: 0.0) in 20.0..300.0,
+                            onClick = {
+                                val kg = weight.toDoubleOrNull()
+                                weightProblem = if (kg == null || kg !in 20.0..300.0) {
+                                    LocalizedNotificationText(
+                                        "Enter your weight from 20 to 300 kg.",
+                                        "Masukkan berat anda dari 20 hingga 300 kg.",
+                                        "请输入 20 至 300 公斤之间的体重。",
+                                        "20 முதல் 300 கி.கி. வரை உங்கள் எடையை உள்ளிடுங்கள்."
+                                    )
+                                } else null
+                                if (weightProblem == null && kg != null) vm.saveWeight(date, kg)
+                            },
+                            enabled = savingLabel == null,
                             modifier = Modifier.fillMaxWidth()
                         ) { Text(if (status.hasWeight) AppLanguage.text("Update Weight", "Kemas Kini Berat") else AppLanguage.text("Save Weight", "Catat Berat")) }
                     }
@@ -2242,6 +2291,76 @@ private fun SimpleTripleLineChart(
     if (!hasData) Text(emptyText, style = MaterialTheme.typography.bodySmall, color = axisTextColor)
 }
 
+
+enum class ProfileField {
+    NAME, AGE, IC, SYS, DIA, HEART_RATE, DRY_WEIGHT, HEIGHT;
+
+    /** Field name used to start the error message, so patients know where to look. */
+    fun label(): String = when (this) {
+        NAME -> AppLanguage.text("Nickname", "Nama Panggilan", "昵称", "புனைப்பெயர்")
+        AGE -> AppLanguage.text("Age", "Umur", "年龄", "வயது")
+        IC -> AppLanguage.text("IC / Identification Number", "No. IC / Pengenalan", "身份证号码", "அடையாள அட்டை எண்")
+        SYS -> "SYS"
+        DIA -> "DIA"
+        HEART_RATE -> AppLanguage.text("Heart Rate", "Kadar Jantung", "心率", "இதயத் துடிப்பு")
+        DRY_WEIGHT -> AppLanguage.text("Dry Weight", "Berat Kering", "干体重", "உலர் எடை")
+        HEIGHT -> AppLanguage.text("Height", "Tinggi", "身高", "உயரம்")
+    }
+}
+
+/** Safe input ranges for one blood pressure reading; they match the Profile baseline checks. */
+private object VitalLimits {
+    val SYS = 60..250
+    val DIA = 30..150
+    val PULSE = 30..220
+}
+
+private enum class VitalField { SYS, DIA, PULSE }
+
+/** Returns the first field the patient must fix, with a message that names it, or null when valid. */
+private fun findVitalsProblem(sys: Int?, dia: Int?, pulse: Int?): Pair<VitalField, LocalizedNotificationText>? = when {
+    sys == null -> VitalField.SYS to LocalizedNotificationText(
+        "Choose your SYS (top number).", "Pilih SYS anda (nombor atas).",
+        "请选择 SYS（上面的数字）。", "உங்கள் SYS (மேல் எண்) தேர்ந்தெடுக்கவும்."
+    )
+    sys !in VitalLimits.SYS -> VitalField.SYS to LocalizedNotificationText(
+        "SYS must be from 60 to 250. Please check the reading.", "SYS mesti dari 60 hingga 250. Sila semak bacaan.",
+        "SYS 必须在 60 至 250 之间，请检查读数。", "SYS 60 முதல் 250 வரை இருக்க வேண்டும். அளவைச் சரிபார்க்கவும்."
+    )
+    dia == null -> VitalField.DIA to LocalizedNotificationText(
+        "Choose your DIA (middle number).", "Pilih DIA anda (nombor tengah).",
+        "请选择 DIA（中间的数字）。", "உங்கள் DIA (நடு எண்) தேர்ந்தெடுக்கவும்."
+    )
+    dia !in VitalLimits.DIA -> VitalField.DIA to LocalizedNotificationText(
+        "DIA must be from 30 to 150. Please check the reading.", "DIA mesti dari 30 hingga 150. Sila semak bacaan.",
+        "DIA 必须在 30 至 150 之间，请检查读数。", "DIA 30 முதல் 150 வரை இருக்க வேண்டும். அளவைச் சரிபார்க்கவும்."
+    )
+    sys <= dia -> VitalField.DIA to LocalizedNotificationText(
+        "DIA must be lower than SYS. Please check both numbers.", "DIA mesti lebih rendah daripada SYS. Sila semak kedua-dua nombor.",
+        "DIA 必须低于 SYS，请检查两个数字。", "DIA, SYS-ஐ விட குறைவாக இருக்க வேண்டும். இரண்டு எண்களையும் சரிபார்க்கவும்."
+    )
+    pulse == null -> VitalField.PULSE to LocalizedNotificationText(
+        "Choose your pulse (bottom number).", "Pilih nadi anda (nombor bawah).",
+        "请选择脉搏（下面的数字）。", "உங்கள் நாடித்துடிப்பை (கீழ் எண்) தேர்ந்தெடுக்கவும்."
+    )
+    pulse !in VitalLimits.PULSE -> VitalField.PULSE to LocalizedNotificationText(
+        "Pulse must be from 30 to 220. Please check the reading.", "Nadi mesti dari 30 hingga 220. Sila semak bacaan.",
+        "脉搏必须在 30 至 220 之间，请检查读数。", "நாடித்துடிப்பு 30 முதல் 220 வரை இருக்க வேண்டும். அளவைச் சரிபார்க்கவும்."
+    )
+    else -> null
+}
+
+/** Red helper text placed directly under the field it describes. */
+@Composable
+private fun FieldProblemText(problem: LocalizedNotificationText?) {
+    if (problem == null) return
+    Text(
+        problem.resolve(),
+        color = MaterialTheme.colorScheme.error,
+        style = MaterialTheme.typography.bodySmall,
+        modifier = Modifier.padding(start = 4.dp)
+    )
+}
 
 @Composable
 private fun NumberRollFieldSimple(
@@ -2826,6 +2945,16 @@ fun HelpScreen(onBack: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall
                 )
             }
+            item {
+                Text(
+                    AppLanguage.text("App version", "Versi aplikasi", "应用版本", "செயலி பதிப்பு") +
+                        " " + BuildConfig.VERSION_NAME,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF64748B)
+                )
+            }
         }
     }
 }
@@ -2855,6 +2984,15 @@ class ProfileViewModel @Inject constructor(
     val saving = _saving.asStateFlow()
     private val _successEvent = MutableStateFlow(0)
     val successEvent = _successEvent.asStateFlow()
+    private val _fieldProblem = MutableStateFlow<Pair<ProfileField, String>?>(null)
+    /** The profile field that must be fixed, shown in red under that field. */
+    val fieldProblem = _fieldProblem.asStateFlow()
+    fun clearFieldProblem(field: ProfileField) {
+        if (_fieldProblem.value?.first == field) _fieldProblem.value = null
+    }
+    private val _loginUserId = MutableStateFlow("")
+    /** The User ID the patient signs in with, e.g. P002. */
+    val loginUserId = _loginUserId.asStateFlow()
     private var pid = ""
 
     init {
@@ -2863,6 +3001,11 @@ class ProfileViewModel @Inject constructor(
                 pid = id.orEmpty()
                 if (pid.isNotBlank()) load()
             }
+        }
+        viewModelScope.launch {
+            combine(session.assignedUserId, session.userEmail) { assigned, email ->
+                assigned?.takeIf { it.isNotBlank() } ?: email?.substringBefore('@').orEmpty()
+            }.collect { _loginUserId.value = it.uppercase() }
         }
     }
 
@@ -2888,9 +3031,94 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
+    /** Checks the profile form and marks the first field to fix. Returns true when every field is valid. */
+    fun validateProfile(
+        fullName: String,
+        birthDate: String,
+        ic: String,
+        systolic: String,
+        diastolic: String,
+        heartRate: String,
+        dryWeight: String,
+        height: String
+    ): Boolean {
+        val parsedBirthDate = runCatching { LocalDate.parse(birthDate) }.getOrNull()
+        val parsedAge = parsedBirthDate?.let { ageOnDate(it, MalaysiaDateTime.today()) }
+        val parsedSys = systolic.toIntOrNull()
+        val parsedDia = diastolic.toIntOrNull()
+        val parsedHeartRate = heartRate.toIntOrNull()
+        val parsedDryWeight = dryWeight.toDoubleOrNull()
+        val parsedHeight = height.toDoubleOrNull()
+
+        val problem: Pair<ProfileField, String>? = when {
+            fullName.trim().length < 2 -> ProfileField.NAME to AppLanguage.text(
+                "Please enter a nickname of at least 2 letters.", "Sila masukkan nama panggilan sekurang-kurangnya 2 huruf.",
+                "请输入至少 2 个字的昵称。", "குறைந்தது 2 எழுத்துகள் கொண்ட புனைப்பெயரை உள்ளிடுங்கள்."
+            )
+            parsedBirthDate == null -> ProfileField.AGE to AppLanguage.text(
+                "Please choose your date of birth.",
+                "Sila pilih tarikh lahir anda.",
+                "请选择您的出生日期。",
+                "உங்கள் பிறந்த தேதியைத் தேர்ந்தெடுக்கவும்."
+            )
+            parsedAge == null || parsedAge !in 1..120 -> ProfileField.AGE to AppLanguage.text(
+                "Please check your date of birth. Your age must be from 1 to 120.",
+                "Sila semak tarikh lahir anda. Umur mesti dari 1 hingga 120.",
+                "请检查出生日期，年龄必须在 1 至 120 岁之间。",
+                "உங்கள் பிறந்த தேதியைச் சரிபார்க்கவும். வயது 1 முதல் 120 வரை இருக்க வேண்டும்."
+            )
+            ic.trim().length < 5 -> ProfileField.IC to AppLanguage.text(
+                "Please enter a valid IC or identification number.",
+                "Sila masukkan nombor IC atau pengenalan yang sah.",
+                "请输入有效的身份证号码。",
+                "சரியான அடையாள அட்டை எண்ணை உள்ளிடுங்கள்."
+            )
+            parsedSys == null || parsedSys !in 60..250 -> ProfileField.SYS to AppLanguage.text(
+                "Please enter a valid systolic BP from 60 to 250.",
+                "Sila masukkan BP sistolik yang sah dari 60 hingga 250.",
+                "请输入60至250之间的有效收缩压。",
+                "60 முதல் 250 வரை சரியான சிஸ்டாலிக் இரத்த அழுத்தத்தை உள்ளிடுங்கள்."
+            )
+            parsedDia == null || parsedDia !in 30..150 -> ProfileField.DIA to AppLanguage.text(
+                "Please enter a valid diastolic BP from 30 to 150.",
+                "Sila masukkan BP diastolik yang sah dari 30 hingga 150.",
+                "请输入30至150之间的有效舒张压。",
+                "30 முதல் 150 வரை சரியான டயஸ்டாலிக் இரத்த அழுத்தத்தை உள்ளிடுங்கள்."
+            )
+            parsedSys <= parsedDia -> ProfileField.DIA to AppLanguage.text(
+                "Systolic BP must be higher than diastolic BP.",
+                "BP sistolik mesti lebih tinggi daripada BP diastolik.",
+                "收缩压必须高于舒张压。",
+                "சிஸ்டாலிக் அழுத்தம் டயஸ்டாலிக் அழுத்தத்தை விட அதிகமாக இருக்க வேண்டும்."
+            )
+            parsedHeartRate == null || parsedHeartRate !in 30..220 -> ProfileField.HEART_RATE to AppLanguage.text(
+                "Please enter a valid heart rate from 30 to 220 bpm.",
+                "Sila masukkan kadar jantung yang sah dari 30 hingga 220 bpm.",
+                "请输入30至220 bpm之间的有效心率。",
+                "30 முதல் 220 bpm வரை சரியான இதயத் துடிப்பை உள்ளிடுங்கள்."
+            )
+            parsedDryWeight == null || parsedDryWeight !in 20.0..300.0 -> ProfileField.DRY_WEIGHT to AppLanguage.text(
+                "Please enter a valid dry weight from 20 to 300 kg.",
+                "Sila masukkan berat kering yang sah dari 20 hingga 300 kg.",
+                "请输入20至300公斤之间的有效干体重。",
+                "20 முதல் 300 கிலோ வரை சரியான உலர் எடையை உள்ளிடுங்கள்."
+            )
+            parsedHeight == null || parsedHeight !in 100.0..250.0 -> ProfileField.HEIGHT to AppLanguage.text(
+                "Please enter a valid height from 100 to 250 cm.",
+                "Sila masukkan tinggi yang sah dari 100 hingga 250 cm.",
+                "请输入100至250厘米之间的有效身高。",
+                "100 முதல் 250 செ.மீ. வரை சரியான உயரத்தை உள்ளிடுங்கள்."
+            )
+            else -> null
+        }
+        _fieldProblem.value = problem
+        _msg.value = problem?.let { (field, message) -> "${field.label()}: $message" }
+        return problem == null
+    }
+
     fun submitAndLockProfile(
         fullName: String,
-        age: String,
+        birthDate: String,
         ic: String,
         systolic: String,
         diastolic: String,
@@ -2917,72 +3145,16 @@ class ProfileViewModel @Inject constructor(
             return@launch
         }
 
-        val parsedAge = age.toIntOrNull()
+        if (!validateProfile(fullName, birthDate, ic, systolic, diastolic, heartRate, dryWeight, height)) return@launch
+
+        val validBirthDate = LocalDate.parse(birthDate)
+        // Stored for older pages that still read "age"; the app shows the age from the birth date.
+        val parsedAge = ageOnDate(validBirthDate, MalaysiaDateTime.today())
         val parsedSys = systolic.toIntOrNull()
         val parsedDia = diastolic.toIntOrNull()
         val parsedHeartRate = heartRate.toIntOrNull()
         val parsedDryWeight = dryWeight.toDoubleOrNull()
         val parsedHeight = height.toDoubleOrNull()
-
-        val validationMessage = when {
-            fullName.trim().length < 2 -> AppLanguage.text(
-                "Please enter your full name.", "Sila masukkan nama penuh.",
-                "请输入您的全名。", "உங்கள் முழுப் பெயரை உள்ளிடுங்கள்."
-            )
-            parsedAge == null || parsedAge !in 1..120 -> AppLanguage.text(
-                "Please enter a valid age from 1 to 120.",
-                "Sila masukkan umur yang sah dari 1 hingga 120.",
-                "请输入1至120之间的有效年龄。",
-                "1 முதல் 120 வரை சரியான வயதை உள்ளிடுங்கள்."
-            )
-            ic.trim().length < 5 -> AppLanguage.text(
-                "Please enter a valid IC or identification number.",
-                "Sila masukkan nombor IC atau pengenalan yang sah.",
-                "请输入有效的身份证号码。",
-                "சரியான அடையாள அட்டை எண்ணை உள்ளிடுங்கள்."
-            )
-            parsedSys == null || parsedSys !in 60..250 -> AppLanguage.text(
-                "Please enter a valid systolic BP from 60 to 250.",
-                "Sila masukkan BP sistolik yang sah dari 60 hingga 250.",
-                "请输入60至250之间的有效收缩压。",
-                "60 முதல் 250 வரை சரியான சிஸ்டாலிக் இரத்த அழுத்தத்தை உள்ளிடுங்கள்."
-            )
-            parsedDia == null || parsedDia !in 30..150 -> AppLanguage.text(
-                "Please enter a valid diastolic BP from 30 to 150.",
-                "Sila masukkan BP diastolik yang sah dari 30 hingga 150.",
-                "请输入30至150之间的有效舒张压。",
-                "30 முதல் 150 வரை சரியான டயஸ்டாலிக் இரத்த அழுத்தத்தை உள்ளிடுங்கள்."
-            )
-            parsedSys <= parsedDia -> AppLanguage.text(
-                "Systolic BP must be higher than diastolic BP.",
-                "BP sistolik mesti lebih tinggi daripada BP diastolik.",
-                "收缩压必须高于舒张压。",
-                "சிஸ்டாலிக் அழுத்தம் டயஸ்டாலிக் அழுத்தத்தை விட அதிகமாக இருக்க வேண்டும்."
-            )
-            parsedHeartRate == null || parsedHeartRate !in 30..220 -> AppLanguage.text(
-                "Please enter a valid heart rate from 30 to 220 bpm.",
-                "Sila masukkan kadar jantung yang sah dari 30 hingga 220 bpm.",
-                "请输入30至220 bpm之间的有效心率。",
-                "30 முதல் 220 bpm வரை சரியான இதயத் துடிப்பை உள்ளிடுங்கள்."
-            )
-            parsedDryWeight == null || parsedDryWeight !in 20.0..300.0 -> AppLanguage.text(
-                "Please enter a valid dry weight from 20 to 300 kg.",
-                "Sila masukkan berat kering yang sah dari 20 hingga 300 kg.",
-                "请输入20至300公斤之间的有效干体重。",
-                "20 முதல் 300 கிலோ வரை சரியான உலர் எடையை உள்ளிடுங்கள்."
-            )
-            parsedHeight == null || parsedHeight !in 100.0..250.0 -> AppLanguage.text(
-                "Please enter a valid height from 100 to 250 cm.",
-                "Sila masukkan tinggi yang sah dari 100 hingga 250 cm.",
-                "请输入100至250厘米之间的有效身高。",
-                "100 முதல் 250 செ.மீ. வரை சரியான உயரத்தை உள்ளிடுங்கள்."
-            )
-            else -> null
-        }
-        if (validationMessage != null) {
-            _msg.value = validationMessage
-            return@launch
-        }
 
         val validAge = requireNotNull(parsedAge)
         val validSys = requireNotNull(parsedSys)
@@ -3001,6 +3173,7 @@ class ProfileViewModel @Inject constructor(
                         user_id = pid,
                         full_name = fullName.trim(),
                         age = validAge,
+                        date_of_birth = validBirthDate.toString(),
                         ic = ic.trim(),
                         systolic_bp = validSys,
                         diastolic_bp = validDia,
@@ -3020,6 +3193,7 @@ class ProfileViewModel @Inject constructor(
                     mapOf(
                         "full_name" to fullName.trim(),
                         "age" to validAge,
+                        "date_of_birth" to validBirthDate.toString(),
                         "ic" to ic.trim(),
                         "systolic_bp" to validSys,
                         "diastolic_bp" to validDia,
@@ -3104,10 +3278,12 @@ fun ProfileScreen(
     RefreshCoinsOnResume { vm.load() }
     val saving by vm.saving.collectAsState()
     val successEvent by vm.successEvent.collectAsState()
+    val loginUserId by vm.loginUserId.collectAsState()
+    val fieldProblem by vm.fieldProblem.collectAsState()
     val locked = profile?.isCompletedAndLocked() == true
 
     var fullName by remember(profile?.full_name) { mutableStateOf(profile?.full_name.orEmpty()) }
-    var age by remember(profile?.age) { mutableStateOf(profile?.age?.toString().orEmpty()) }
+    var birthDate by remember(profile?.date_of_birth) { mutableStateOf(profile?.date_of_birth?.take(10).orEmpty()) }
     var ic by remember(profile?.ic) { mutableStateOf(profile?.ic.orEmpty()) }
     var systolic by remember(profile?.systolic_bp) { mutableStateOf(profile?.systolic_bp?.toString().orEmpty()) }
     var diastolic by remember(profile?.diastolic_bp) { mutableStateOf(profile?.diastolic_bp?.toString().orEmpty()) }
@@ -3157,7 +3333,7 @@ fun ProfileScreen(
                 Button(
                     onClick = {
                         vm.submitAndLockProfile(
-                            fullName, age, ic, systolic, diastolic, heartRate,
+                            fullName, birthDate, ic, systolic, diastolic, heartRate,
                             dryWeight, height, currentMedication
                         ) {
                             showLockConfirmation = false
@@ -3256,36 +3432,48 @@ fun ProfileScreen(
                 "个人信息", "தனிப்பட்ட தகவல்"
             ), Icons.Default.Person) }
             item {
-                OutlinedTextField(
-                    fullName,
-                    { if (!locked) fullName = it },
-                    Modifier.fillMaxWidth(),
-                    label = { Text(AppLanguage.text("Full Name *", "Nama Penuh *", "全名 *", "முழுப் பெயர் *")) },
-                    singleLine = true,
-                    readOnly = locked,
-                    enabled = !locked
+                // Read-only: the User ID is assigned by the administrator.
+                Text(
+                    AppLanguage.text("User ID", "ID Pengguna", "用户 ID", "பயனர் ID") +
+                        ": " + loginUserId.ifBlank { "-" },
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
             item {
                 OutlinedTextField(
-                    age,
-                    { if (!locked) age = it.filter(Char::isDigit).take(3) },
+                    fullName,
+                    { if (!locked) { fullName = it; vm.clearFieldProblem(ProfileField.NAME) } },
                     Modifier.fillMaxWidth(),
-                    label = { Text(AppLanguage.text("Age *", "Umur *", "年龄 *", "வயது *")) },
+                    label = { Text(AppLanguage.text("Nickname *", "Nama Panggilan *", "昵称 *", "புனைப்பெயர் *")) },
                     singleLine = true,
                     readOnly = locked,
-                    enabled = !locked
+                    enabled = !locked,
+                    isError = fieldProblem?.first == ProfileField.NAME,
+                    supportingText = fieldProblem?.takeIf { it.first == ProfileField.NAME }?.let { problem -> { Text(problem.second) } }
+                )
+            }
+            item {
+                BirthDateField(
+                    birthDate = birthDate,
+                    // Profiles submitted before this change only have the age.
+                    savedAge = profile?.age,
+                    locked = locked,
+                    problem = fieldProblem?.takeIf { it.first == ProfileField.AGE }?.second,
+                    onBirthDateSelected = { birthDate = it; vm.clearFieldProblem(ProfileField.AGE) }
                 )
             }
             item {
                 OutlinedTextField(
                     ic,
-                    { if (!locked) ic = it.take(30) },
+                    { if (!locked) { ic = it.take(30); vm.clearFieldProblem(ProfileField.IC) } },
                     Modifier.fillMaxWidth(),
                     label = { Text(AppLanguage.text("IC / Identification Number *", "No. IC / Pengenalan *", "身份证号码 *", "அடையாள அட்டை எண் *")) },
                     singleLine = true,
                     readOnly = locked,
-                    enabled = !locked
+                    enabled = !locked,
+                    isError = fieldProblem?.first == ProfileField.IC,
+                    supportingText = fieldProblem?.takeIf { it.first == ProfileField.IC }?.let { problem -> { Text(problem.second) } }
                 )
             }
 
@@ -3297,28 +3485,32 @@ fun ProfileScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         systolic,
-                        { if (!locked) systolic = it.filter(Char::isDigit).take(3) },
+                        { if (!locked) { systolic = it.filter(Char::isDigit).take(3); vm.clearFieldProblem(ProfileField.SYS) } },
                         Modifier.weight(1f),
                         label = { Text("SYS *") },
                         singleLine = true,
                         readOnly = locked,
-                        enabled = !locked
+                        enabled = !locked,
+                        isError = fieldProblem?.first == ProfileField.SYS,
+                        supportingText = fieldProblem?.takeIf { it.first == ProfileField.SYS }?.let { problem -> { Text(problem.second) } }
                     )
                     OutlinedTextField(
                         diastolic,
-                        { if (!locked) diastolic = it.filter(Char::isDigit).take(3) },
+                        { if (!locked) { diastolic = it.filter(Char::isDigit).take(3); vm.clearFieldProblem(ProfileField.DIA) } },
                         Modifier.weight(1f),
                         label = { Text("DIA *") },
                         singleLine = true,
                         readOnly = locked,
-                        enabled = !locked
+                        enabled = !locked,
+                        isError = fieldProblem?.first == ProfileField.DIA,
+                        supportingText = fieldProblem?.takeIf { it.first == ProfileField.DIA }?.let { problem -> { Text(problem.second) } }
                     )
                 }
             }
             item {
                 OutlinedTextField(
                     heartRate,
-                    { if (!locked) heartRate = it.filter(Char::isDigit).take(3) },
+                    { if (!locked) { heartRate = it.filter(Char::isDigit).take(3); vm.clearFieldProblem(ProfileField.HEART_RATE) } },
                     Modifier.fillMaxWidth(),
                     label = { Text(AppLanguage.text(
                         "Resting Heart Rate / Pulse *", "Kadar Jantung / Nadi Rehat *",
@@ -3326,28 +3518,34 @@ fun ProfileScreen(
                     )) },
                     singleLine = true,
                     readOnly = locked,
-                    enabled = !locked
+                    enabled = !locked,
+                    isError = fieldProblem?.first == ProfileField.HEART_RATE,
+                    supportingText = fieldProblem?.takeIf { it.first == ProfileField.HEART_RATE }?.let { problem -> { Text(problem.second) } }
                 )
             }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         dryWeight,
-                        { if (!locked) dryWeight = it.filter { ch -> ch.isDigit() || ch == '.' }.take(6) },
+                        { if (!locked) { dryWeight = it.filter { ch -> ch.isDigit() || ch == '.' }.take(6); vm.clearFieldProblem(ProfileField.DRY_WEIGHT) } },
                         Modifier.weight(1f),
                         label = { Text(AppLanguage.text("Dry Weight kg *", "Berat Kering kg *", "干体重 kg *", "உலர் எடை kg *")) },
                         singleLine = true,
                         readOnly = locked,
-                        enabled = !locked
+                        enabled = !locked,
+                        isError = fieldProblem?.first == ProfileField.DRY_WEIGHT,
+                        supportingText = fieldProblem?.takeIf { it.first == ProfileField.DRY_WEIGHT }?.let { problem -> { Text(problem.second) } }
                     )
                     OutlinedTextField(
                         height,
-                        { if (!locked) height = it.filter { ch -> ch.isDigit() || ch == '.' }.take(6) },
+                        { if (!locked) { height = it.filter { ch -> ch.isDigit() || ch == '.' }.take(6); vm.clearFieldProblem(ProfileField.HEIGHT) } },
                         Modifier.weight(1f),
                         label = { Text(AppLanguage.text("Height cm *", "Tinggi cm *", "身高 cm *", "உயரம் cm *")) },
                         singleLine = true,
                         readOnly = locked,
-                        enabled = !locked
+                        enabled = !locked,
+                        isError = fieldProblem?.first == ProfileField.HEIGHT,
+                        supportingText = fieldProblem?.takeIf { it.first == ProfileField.HEIGHT }?.let { problem -> { Text(problem.second) } }
                     )
                 }
             }
@@ -3389,7 +3587,12 @@ fun ProfileScreen(
             if (!locked) {
                 item {
                     Button(
-                        onClick = { showLockConfirmation = true },
+                        onClick = {
+                            // Point at the field to fix before asking to lock the profile.
+                            if (vm.validateProfile(fullName, birthDate, ic, systolic, diastolic, heartRate, dryWeight, height)) {
+                                showLockConfirmation = true
+                            }
+                        },
                         enabled = !saving,
                         modifier = Modifier.fillMaxWidth().height(54.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00ACC1))
@@ -3469,6 +3672,94 @@ fun ProfileScreen(
             }
         }
     )
+}
+
+/** Whole years between [birthDate] and [today]; it goes up by itself on each birthday. */
+fun ageOnDate(birthDate: LocalDate, today: LocalDate): Int =
+    java.time.Period.between(birthDate, today).years
+
+/** Calendar field for the date of birth, with the age worked out underneath. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BirthDateField(
+    birthDate: String,
+    savedAge: Int?,
+    locked: Boolean,
+    problem: String?,
+    onBirthDateSelected: (String) -> Unit
+) {
+    var showPicker by remember { mutableStateOf(false) }
+    val today = MalaysiaDateTime.today()
+    val parsed = runCatching { LocalDate.parse(birthDate) }.getOrNull()
+    val age = parsed?.let { ageOnDate(it, today) } ?: savedAge.takeIf { parsed == null && locked }
+
+    OutlinedButton(
+        onClick = { showPicker = true },
+        enabled = !locked,
+        modifier = Modifier.fillMaxWidth().height(62.dp),
+        shape = RoundedCornerShape(12.dp),
+        border = if (problem != null) BorderStroke(2.dp, MaterialTheme.colorScheme.error) else ButtonDefaults.outlinedButtonBorder(enabled = !locked),
+        contentPadding = PaddingValues(horizontal = 14.dp)
+    ) {
+        Icon(Icons.Default.CalendarMonth, null)
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
+            Text(
+                AppLanguage.text("Date of Birth *", "Tarikh Lahir *", "出生日期 *", "பிறந்த தேதி *"),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                parsed?.let { formatAlphabeticalFullDate(it.toString()) }
+                    ?: AppLanguage.text("Tap to choose", "Ketik untuk memilih", "点击选择", "தேர்ந்தெடுக்கத் தட்டவும்"),
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Icon(Icons.Default.ArrowDropDown, null)
+    }
+    if (problem != null) {
+        Text(problem, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 4.dp))
+    } else if (age != null) {
+        Text(
+            AppLanguage.text("Age", "Umur", "年龄", "வயது") + ": $age",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(start = 4.dp)
+        )
+    }
+
+    if (showPicker) {
+        // The date picker works in UTC milliseconds, so convert in UTC to avoid an off-by-one day.
+        val utc = ZoneId.of("UTC")
+        val todayMillis = today.atStartOfDay(utc).toInstant().toEpochMilli()
+        val pickerState = rememberDatePickerState(
+            initialSelectedDateMillis = parsed?.atStartOfDay(utc)?.toInstant()?.toEpochMilli(),
+            // Open near a typical patient's birth year instead of today.
+            initialDisplayedMonthMillis = (parsed ?: today.minusYears(60)).atStartOfDay(utc).toInstant().toEpochMilli(),
+            yearRange = (today.year - 120)..today.year,
+            selectableDates = object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis <= todayMillis
+                override fun isSelectableYear(year: Int) = year <= today.year
+            }
+        )
+        DatePickerDialog(
+            onDismissRequest = { showPicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    pickerState.selectedDateMillis?.let { millis ->
+                        onBirthDateSelected(Instant.ofEpochMilli(millis).atZone(utc).toLocalDate().toString())
+                    }
+                    showPicker = false
+                }) { Text(AppLanguage.text("OK", "OK", "确定", "சரி")) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPicker = false }) {
+                    Text(AppLanguage.text("Cancel", "Batal", "取消", "ரத்து"))
+                }
+            }
+        ) {
+            DatePicker(state = pickerState)
+        }
+    }
 }
 
 @Composable

@@ -36,10 +36,6 @@ class SystemReminderWorker(appContext: Context, params: WorkerParameters) : Coro
             val now = MalaysiaDateTime.now()
             val today = now.toLocalDate().toString()
             val api = auth.api
-            val medications = api.getMedications("eq.${auth.patientId}").body().orEmpty().filter { it.is_active }
-            val medicationSchedules = runCatching {
-                api.getMedicationSchedule("eq.${auth.patientId}").body().orEmpty()
-            }.getOrDefault(emptyList())
             // Match the appointment page: entries can come from either table.
             val appointmentRows = runCatching {
                 api.getAppointments("eq.${auth.patientId}").body().orEmpty()
@@ -68,50 +64,8 @@ class SystemReminderWorker(appContext: Context, params: WorkerParameters) : Coro
             val steps = api.getStepsDay("eq.${auth.patientId}").body().orEmpty()
             val profile = api.getProfile("eq.${auth.patientId}").body().orEmpty().firstOrNull()
 
-            // My Medication saves the patient's medicines in profiles.current_medication,
-            // while administrator-managed medicines use the medication/medication_schedule
-            // tables. Read both sources so reminders are not silently skipped when the
-            // structured table is empty.
-            val profileMedications = profile?.current_medication
-                ?.let(MedicationTiming::parseProfile)
-                .orEmpty()
-            val medicationSlot = MedicationTiming.visibleSlot(now)
-            val dueMedications = medicationSlot?.let { slot ->
-                MedicationTiming.due(profileMedications, medications, medicationSchedules, slot)
-            }.orEmpty()
-
-            if (dueMedications.isNotEmpty()) {
-                val slotKey = when (medicationSlot) {
-                    MedicationTiming.DAY -> "medicine_day"
-                    MedicationTiming.NIGHT -> "medicine_night"
-                    else -> null
-                }
-                if (slotKey != null) {
-                    val medicineNames = dueMedications.joinToString(", ") { it.name }.take(180)
-                    val title = AppLanguage.text(
-                        "Medicine reminder",
-                        "Peringatan ubat",
-                        "用药提醒",
-                        "மருந்து நினைவூட்டல்"
-                    )
-                    val message = if (medicationSlot == MedicationTiming.DAY) {
-                        AppLanguage.text(
-                            "It is time for your daytime medicine${if (medicineNames.isBlank()) "." else ": $medicineNames."}",
-                            "Sudah tiba masa untuk ubat siang anda${if (medicineNames.isBlank()) "." else ": $medicineNames."}",
-                            "现在是服用日间药物的时间${if (medicineNames.isBlank()) "。" else "：$medicineNames。"}",
-                            "உங்கள் பகல் மருந்தை எடுத்துக்கொள்ள வேண்டிய நேரம் இது${if (medicineNames.isBlank()) "." else ": $medicineNames."}"
-                        )
-                    } else {
-                        AppLanguage.text(
-                            "It is time for your night medicine${if (medicineNames.isBlank()) "." else ": $medicineNames."}",
-                            "Sudah tiba masa untuk ubat malam anda${if (medicineNames.isBlank()) "." else ": $medicineNames."}",
-                            "现在是服用夜间药物的时间${if (medicineNames.isBlank()) "。" else "：$medicineNames。"}",
-                            "உங்கள் இரவு மருந்தை எடுத்துக்கொள்ள வேண்டிய நேரம் இது${if (medicineNames.isBlank()) "." else ": $medicineNames."}"
-                        )
-                    }
-                    postOnce(context, auth.patientId, "$today|$slotKey", NotificationSoundChannels.Sound.MEDICINE, title, message, Route.Dashboard.path)
-                }
-            }
+            // Medicines are not sent as phone notifications (client request).
+            // Patients tick them in Today's Advice on the home page instead.
 
             if (now.hour >= 18) {
                 if (weights.none { it.date == today }) postOnce(context, auth.patientId, "$today|weight", NotificationSoundChannels.Sound.WEIGHT, "Weight reminder", "Please record today's weight.", Route.SelfCheck.focus("weight"))

@@ -29,6 +29,8 @@ data class ProfileRow(
     val user_id: String? = null,
     val full_name: String? = null,
     val age: Int? = null,
+    /** yyyy-MM-dd; the age shown in the app is worked out from this. */
+    val date_of_birth: String? = null,
     val ic: String? = null,
     val systolic_bp: Int? = null,
     val diastolic_bp: Int? = null,
@@ -51,6 +53,8 @@ data class ProfileUpsert(
     val user_id: String,
     val full_name: String? = null,
     val age: Int? = null,
+    /** yyyy-MM-dd; the age shown in the app is worked out from this. */
+    val date_of_birth: String? = null,
     val ic: String? = null,
     val systolic_bp: Int? = null,
     val diastolic_bp: Int? = null,
@@ -228,7 +232,9 @@ data class PatientNotification(
     val title: String? = null,
     val message: String? = null,
     val scheduled_for: String? = null,
-    val created_at: String? = null
+    val created_at: String? = null,
+    /** Malaysia date the server created an automatic reminder for (yyyy-MM-dd). */
+    val notification_date: String? = null
 )
 
 data class WaterSaltLog(

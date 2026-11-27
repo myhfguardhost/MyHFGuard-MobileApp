@@ -21,8 +21,8 @@ android {
         applicationId = "com.vitalink.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 16
-        versionName = "2.1-ai-nurse-v2-tts-guard"
+        versionCode = 17
+        versionName = "2.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "SUPABASE_URL", "\"https://sqmiosfervzwrxjastdg.supabase.co\"")

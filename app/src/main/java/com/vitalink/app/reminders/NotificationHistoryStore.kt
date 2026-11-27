@@ -41,12 +41,13 @@ object NotificationHistoryStore {
      * all languages, while new notification producers should use the localized overload.
      */
     @Synchronized
-    fun record(context: Context, title: String, message: String, route: String) {
+    fun record(context: Context, title: String, message: String, route: String, at: Instant = Instant.now()) {
         record(
             context = context,
             title = LocalizedNotificationText(title, title, title, title),
             message = LocalizedNotificationText(message, message, message, message),
-            route = route
+            route = route,
+            at = at
         )
     }
 
@@ -55,13 +56,14 @@ object NotificationHistoryStore {
         context: Context,
         title: LocalizedNotificationText,
         message: LocalizedNotificationText,
-        route: String
+        route: String,
+        at: Instant = Instant.now()
     ) {
         val items = read(context).toMutableList()
         val duplicate = items.firstOrNull {
             it.title.en == title.en && it.message.en == message.en && it.route == route &&
                 runCatching {
-                    Instant.parse(it.timestamp).isAfter(Instant.now().minusSeconds(120))
+                    Instant.parse(it.timestamp).isAfter(at.minusSeconds(120))
                 }.getOrDefault(false)
         }
         if (duplicate != null) return
@@ -72,12 +74,17 @@ object NotificationHistoryStore {
                 id = UUID.randomUUID().toString(),
                 title = title,
                 message = message,
-                timestamp = Instant.now().toString(),
+                // The time it was meant for, so a late delivery keeps its real time.
+                timestamp = at.toString(),
                 route = route,
                 read = false
             )
         )
-        write(context, items.take(MAX_ITEMS))
+        // Newest first, even when an older message arrives late.
+        val sorted = items.sortedByDescending {
+            runCatching { Instant.parse(it.timestamp) }.getOrDefault(Instant.EPOCH)
+        }
+        write(context, sorted.take(MAX_ITEMS))
     }
 
     @Synchronized
