@@ -1,9 +1,11 @@
 package com.vitalink.app.data.api
 
+import android.app.NotificationManager
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
+import com.vitalink.app.reminders.NotificationHistoryStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -61,6 +63,7 @@ class SessionManager @Inject constructor(@ApplicationContext private val ctx: Co
             it[KEY_EMAIL]   = email
             it[KEY_ROLE]    = role
         }
+        NotificationHistoryStore.setActivePatient(ctx, patientId)
     }
 
     suspend fun saveFirstName(name: String) { ctx.dataStore.edit { it[KEY_NAME] = name } }
@@ -73,5 +76,11 @@ class SessionManager @Inject constructor(@ApplicationContext private val ctx: Co
         ctx.dataStore.edit { it[KEY_TOKEN] = token; it[KEY_REFRESH] = refresh }
     }
 
-    suspend fun clear() { ctx.dataStore.edit { it.clear() } }
+    suspend fun clear() {
+        ctx.dataStore.edit { it.clear() }
+        // The next person to sign in must not see this patient's bell history or
+        // the notifications still sitting in the phone's notification tray.
+        NotificationHistoryStore.setActivePatient(ctx, null)
+        runCatching { ctx.getSystemService(NotificationManager::class.java)?.cancelAll() }
+    }
 }
